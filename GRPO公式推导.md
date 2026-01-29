@@ -11,8 +11,8 @@
 相应的，把强化学习的概念对应到LLM上：
 **token级建模**
 - 状态s：
-  - 初始状态$s_0$：prompt $x$
-  - t时刻状态$s_t$：prompt $x$ + response的前t个token $y_{1:t}$
+  - 初始状态 $s_1$：prompt $x$
+  - t时刻状态 $s_t$：prompt $x$ + response的前t个token $y_{1:t}$
   - （*此处 $y_i$ 指的是序列 y 的第 i 个token*）
 - 动作a：
   - t时刻的动作$a_t$：response的第t个token $y_{t}$
@@ -24,8 +24,8 @@
 
 **sequence级建模（只有一问一答）**
 - 状态s：只有初始、结束两个状态
-  - 初始状态$s_0$：prompt $x$
-  - 结束状态$s_1$：prompt $x$ + response $y$
+  - 初始状态 $s_1$：prompt $x$
+  - 结束状态 $s_2$：prompt $x$ + response $y$
 - 动作a：只有一步动作
   - LLM生成的response $y$
 - 奖励r：
@@ -35,13 +35,13 @@
 
 **sequence级建模（多轮问答）**：常见于多轮agent的RL训练，但也可以全拆成单轮
 - 状态s：
-  - 初始状态$s_0$：初始prompt $x_{1}$
-  - t时刻状态$s_t$：初始prompt $x_{1}$ + 第1轮response $y_{1}$ + ... + 第t轮prompt $x_{t}$ + 第t轮response $y_{t}$
+  - 初始状态 $s_1$：初始prompt $x_{1}$
+  - t时刻状态 $s_t$：初始prompt $x_{1}$ + 第1轮response $y_{1}$ + ... + 第t轮prompt $x_{t}$ + 第t轮response $y_{t}$
   - （*此处的 $x_i,y_i$ 指代的是第 i 个 x,y 序列，而不是序列中第i个token*）
 - 动作a：
-  - t时刻的动作$a_t$：第t轮response $y_{t}$
+  - t时刻的动作 $a_t$：第t轮response $y_{t}$
 - 奖励r：
-  - t时刻的奖励$r_t$：第t轮回复的奖励（有些方法有中间奖励），如果t是最后一轮则对应终局奖励
+  - t时刻的奖励 $r_t$：第t轮回复的奖励（有些方法有中间奖励），如果t是最后一轮则对应终局奖励
 - 策略π：
   - LLM生成第t个response的概率 $P(y_t | x_1, y_1, ..., x_{t-1}, y_{t-1}, x_t)$
  
@@ -72,7 +72,7 @@
 ## 强化学习中的随机性：策略随机性 vs 环境随机性
 
 强化学习中的随机性有两个来源：
-- 策略随机性 $π(a|s)$：给定状态s，以某种概率随机生成动作a。（与之相对的是最优性策略：给定s，生成某个“最优”的a）
+- 策略随机性 $π(a|s)$：给定状态s，以根据某种概率分布随机生成动作a。（与之相对的是最优性策略：给定s，生成某个“最优”的a）
 - 环境随机性 $P(s',r|s,a)$：给状态s和动作a，转移到的新状态s'或获得的奖励r有随机性（与之相对的是确定性环境，转移到的s'和r都确定）
 
 标准的RL各种公式（例如贝尔曼方程）中，是按策略、环境都随机给出的。
@@ -81,130 +81,149 @@
 - 策略随机性：对于top-p解码，策略是随机的；对于贪婪解码，策略是确定的
 - 环境随机性：s无随机性（给定s和a，s'=s拼接a）；r如果由规则判断则是确定的，如果是llm-as-judge可能有随机性（本文暂不考虑这种情况）
 
-对于策略随机、环境确定的情况，RL的各种公式相比标准公式（策略随机、环境随机）可以简化。下文会详细列出。
+对于LLM的强化学习（策略随机、环境确定），比标准的强化学习（策略随机、环境随机）的设定更简单，因此各种公式会有一些简化。
+
+## 马尔科夫性
+todo
+
+# 衍生概念：G、V、A、Q
+
+## 轨迹trace（或称episode）
+$τ=(s_1, a_1, r_1, s_2, a_2, r_2, s_3, ..., s_n, a_n, r_n, s_{n+1})$ 从起始到结束称为一个轨迹。
+- 第t步的初始状态为 $s_t$， 执行动作 $a_t$ ， 此时立刻获得奖励 $r_t$ ，并转移到下个状态 $s_{t+1}$
+- 一共执行t=1...n，共n次行动
+
+## 收益（gain）G 与折扣因子 $γ$
+第t步的收益 $G_t = r_{t} + γ r_{t+1} + γ^2 r_{t+2} + ... = \sum_{i=0}^{\infty} γ^i r_{t+i}$
+- 折扣因子 0≤γ≤1
+- 含义：从第t步开始直到终局，累计reward之和（越未来的步骤通常越“不重要”，因此使用折扣γ衰减。γ=0 则只看当前动作的reward，γ=1 则每一步的reward都同等重要）
+- G默认是到终局位置，但也可以计算k步收益：$G_t^{(k)} = r_{t} + γ r_{t+1} + ... + γ^{k-1} r_{t+k-1} = \sum_{i=0}^{k-1} γ^i r_{t+i}$，它在k步时序差分中会用到（本文不介绍）
+- 收益（gain）有时也称作回报（return），两者在强化学习中含义相同，只是不同地方的术语有差异。这里称呼为gain，防止return和reward相似混淆
+
+## 价值（value）函数 $V^π(s)$：
+对于策略π，状态s的价值为：
+$$
+\begin{aligned}
+V^π(s) 
+& = \mathbb{E}_{τ \sim π(a|s)}[G_t | S_t=s] \qquad \text{\# 原始定义} \\
+& = \mathbb{E}_{τ \sim π(a|s)}[r_{t} + γ r_{t+1} + γ^2 r_{t+2} + ... | S_t=s] \\
+& = \sum_{a} π(a|s) \sum_{s',r} P(s',r|s,a)[r+V^π(s')] \qquad \text{\# 递归形式的贝尔曼方程} \\
+& = \sum_{a} π(a|s) [r+V^π(s')]  \qquad  \text{\# 确定性环境下，贝尔曼方程的简化形式}
+\end{aligned}
+$$
+- 其中状态s执行动作a后，获得奖励r，状态变为s'
+- $V^π(s)$ 和 s 处于序列的第几步无关，只和s与π有关。对于不同的策略π，价值 $V^π(s)$ 不同
+
+**辨析：奖励r、收益G、价值V**
+> - 奖励reward：第t步行动**即时**的“收获”
+> - 收益gain：从第t步到终局**累计**的“收获”
+> - 价值V：针对状态s估计的，状态s的“好坏程度”，即从s到终局时，**期望**的累计“收获”有多少
+
+给定很多trace，r是可以直接收集的，G是可以用r和γ累计算出来的，但V是“估计”出来的
+价值V的意义：为了弥补reward的视角。reward从“局部”上衡量了一个动作a有多好，但即时reward高的动作可能后续总奖励少，反之即时reward高的动作可能后续总奖励多。而价值是一种“全局”的上帝视角，衡量了s一直到结束为止总共能产生多少奖励。
+
+- 价值V是客观存在的，但不像r和g一样可以直接计算出来
+- V不能直接计算，但可以估计，估计可能有偏差（估计出的V和客观实际的V不一致）
+- 对V的估计是可以收敛的，偏差越来越小，接近客观真实的V
+- 对V的估计：
+  - 动态规划法中可以为V随机赋值并且迭代解不动点
+  - PPO中用神经网络计算V
+  - 蒙特卡洛中构造统计量估计V
+
+## 动作价值函数 $Q^π(s,a)$
+
+$$
+\begin{aligned}
+Q^π(s,a) 
+& = \mathbb{E}_{τ \sim π(a|s)}[G_t | S_t=s, A_t=a] \qquad \text{\# 原始定义} \\
+& = \mathbb{E}_{τ \sim π(a|s)}[r_{t} + γ r_{t+1} + γ^2 r_{t+2} + ... | S_t=s, A_t=a] \\
+& = \sum_{s',r} P(s',r|s,a) [r+γ\sum_{a'}π(a'|s')Q^π(s',a')] \qquad \text{\# 递归形式的贝尔曼方程} \\
+& = r+γ\sum_{a'}π(a'|s')Q^π(s',a')  \qquad  \text{\# 确定性环境下，贝尔曼方程的简化形式}
+\end{aligned}
+$$
+
+## 贝尔曼方程的各种形式：V←V、Q←Q、V←Q、Q←V 的互相计算
+
+**概率环境**：
+$$
+\begin{aligned}
+% 1. V计算V
+V^π(s) & = \sum_{a} π(a|s) \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s') ] \\
+% 2. Q计算Q
+Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ \sum_{a'} π(a'|s') Q^π(s', a') ] \\
+% 3. 用Q计算V
+V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \\ % 4. 用V计算Q 
+Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s')]
+\end{aligned}
+$$
+
+**确定性环境**：去掉所有 $P(s',r|s,a)$
+$$
+\begin{aligned}
+% 1. V计算V
+V^π(s) & = \sum_{a} π(a|s) [ r + γ V^π(s') ] \\
+% 2. Q计算Q
+Q^π(s, a) & = r + γ \sum_{a'} π(a'|s') Q^π(s', a') \\
+% 3. 用Q计算V
+V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \\ % 4. 用V计算Q 
+Q^π(s, a) & = r + γ V^π(s')
+\end{aligned}
+$$
+
+## 优势（advantage）函数 $A^π(s,a)$
+
+$A^π(s,a) = Q^π(s,a) - V^π(s)$
 
 
 ```
-状态（State）是智能体在某个时刻对环境的完整描述。在马尔可夫决策过程（MDP）中，状态满足马尔可夫性质：未来只依赖于当前状态，与历史无关。
-
-- **数学表示**：$s \in \mathcal{S}$，其中 $\mathcal{S}$ 是状态空间
-- **性质**：$P(s_{t+1} | s_t, a_t, s_{t-1}, ...) = P(s_{t+1} | s_t, a_t)$
-
-## 动作 a
-
-动作（Action）是智能体在给定状态下可以执行的操作。动作的选择会影响环境的状态转移和获得的奖励。
-
-- **数学表示**：$a \in \mathcal{A}(s)$，其中 $\mathcal{A}(s)$ 是状态 $s$ 下的动作空间
-- **动作空间类型**：
-  - 离散动作空间：$\mathcal{A} = \{a_1, a_2, ..., a_n\}$
-  - 连续动作空间：$\mathcal{A} \subseteq \mathbb{R}^n$
-
-## 奖励 r
-
-奖励（Reward）是环境对智能体执行动作后的即时反馈信号。奖励函数定义了任务的目标。
-
-- **数学表示**：$r_t = R(s_t, a_t, s_{t+1})$ 或 $r_t = R(s_t, a_t)$
-- **性质**：奖励是标量值，可以是正数（鼓励）或负数（惩罚）
-- **目标**：最大化累积奖励（回报）
-
-## 策略 π
-
-策略（Policy）定义了智能体在给定状态下选择动作的概率分布。策略是强化学习的核心，决定了智能体的行为。
-
-- **数学表示**：
-  - 随机策略：$\pi(a|s) = P(a|s)$，表示在状态 $s$ 下选择动作 $a$ 的概率
-  - 确定性策略：$\pi(s) = a$，直接映射状态到动作
-- **性质**：
-  - $\sum_{a \in \mathcal{A}} \pi(a|s) = 1$（概率归一化）
-  - $\pi(a|s) \geq 0$（非负性）
-
-## 确定性环境 & 概率环境
-
-### 确定性环境
-
-在确定性环境中，给定状态和动作，下一个状态是唯一确定的：
-
-$$s_{t+1} = f(s_t, a_t)$$
-
-- 状态转移函数是确定性的
-- 奖励函数通常是确定性的：$r_t = R(s_t, a_t)$
-- 简化了分析和计算
-
-### 概率环境
-
-在概率环境（随机环境）中，状态转移和奖励都是随机的：
-
-$$P(s_{t+1}|s_t, a_t) \text{ 是概率分布}$$
-
-$$P(r_t|s_t, a_t) \text{ 是概率分布}$$
-
-- 更符合现实世界的复杂性
-- 需要处理不确定性
-
-### 举例：步枪打靶
-todo
-
-## 在LLM中的对应
-
-在大型语言模型（LLM）的强化学习场景中：
-
-- **状态 s**：当前生成的文本序列（token序列），即 $s = [x_1, x_2, ..., x_t]$
-- **动作 a**：下一个要生成的token，即 $a = x_{t+1}$
-- **奖励 r**：对生成文本的质量评估（如人类反馈、奖励模型评分等）
-- **策略 π**：语言模型的生成策略，即 $P(x_{t+1}|x_1, ..., x_t)$，由模型参数 $\theta$ 参数化
-- **环境**：通常是确定性的（给定prompt和生成策略，输出是确定的），但在训练过程中策略会变化
-
-todo：两种对应方式：动作是token vs 动作是序列
-
-# 衍生概念：G、V、A、Q
 
 ## 回报G
 
 回报（Return）是从某个时刻开始到episode结束的累积奖励，是智能体的长期目标。
 
 - **数学表示**：
-  $$G_t = r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3} + ... = \sum_{k=0}^{\infty} \gamma^k r_{t+k+1}$$
+  $$G_t = r_{t+1} + γ r_{t+2} + γ^2 r_{t+3} + ... = \sum_{k=0}^{\infty} γ^k r_{t+k+1}$$
   
-  其中 $\gamma \in [0, 1]$ 是折扣因子（discount factor）
+  其中 $γ \in [0, 1]$ 是折扣因子（discount factor）
 
 - **有限horizon情况**：
-  $$G_t = \sum_{k=0}^{T-t-1} \gamma^k r_{t+k+1}$$
+  $$G_t = \sum_{k=0}^{T-t-1} γ^k r_{t+k+1}$$
 
-- **无折扣情况**（$\gamma = 1$）：
+- **无折扣情况**（$γ = 1$）：
   $$G_t = \sum_{k=0}^{T-t-1} r_{t+k+1}$$
 
 ## 价值V
 
-状态价值函数（State Value Function）$V^{\pi}(s)$ 表示在策略 $\pi$ 下，从状态 $s$ 开始的期望回报。
+状态价值函数（State Value Function）$V^{π}(s)$ 表示在策略 $π$ 下，从状态 $s$ 开始的期望回报。
 
 - **数学定义**：
-  $$V^{\pi}(s) = \mathbb{E}_{\pi}[G_t | s_t = s] = \mathbb{E}_{\pi}\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s\right]$$
+  $$V^{π}(s) = \mathbb{E}_{π}[G_t | s_t = s] = \mathbb{E}_{π}[\sum_{k=0}^{\infty} γ^k r_{t+k+1} \Big| s_t = s]$$
 
-- **含义**：衡量在策略 $\pi$ 下，状态 $s$ 的"好坏程度"
+- **含义**：衡量在策略 $π$ 下，状态 $s$ 的"好坏程度"
 
 ## 优势A
 
-优势函数（Advantage Function）$A^{\pi}(s, a)$ 表示在状态 $s$ 下执行动作 $a$ 相对于平均水平的优势。
+优势函数（Advantage Function）$A^{π}(s, a)$ 表示在状态 $s$ 下执行动作 $a$ 相对于平均水平的优势。
 
 - **数学定义**：
-  $$A^{\pi}(s, a) = Q^{\pi}(s, a) - V^{\pi}(s)$$
+  $$A^{π}(s, a) = Q^{π}(s, a) - V^{π}(s)$$
 
 - **含义**：
-  - $A^{\pi}(s, a) > 0$：动作 $a$ 优于平均水平
-  - $A^{\pi}(s, a) < 0$：动作 $a$ 劣于平均水平
-  - $A^{\pi}(s, a) = 0$：动作 $a$ 等于平均水平
+  - $A^{π}(s, a) > 0$：动作 $a$ 优于平均水平
+  - $A^{π}(s, a) < 0$：动作 $a$ 劣于平均水平
+  - $A^{π}(s, a) = 0$：动作 $a$ 等于平均水平
 
 ## Q函数
 
-动作价值函数（Action-Value Function）$Q^{\pi}(s, a)$ 表示在策略 $\pi$ 下，在状态 $s$ 执行动作 $a$ 后的期望回报。
+动作价值函数（Action-Value Function）$Q^{π}(s, a)$ 表示在策略 $π$ 下，在状态 $s$ 执行动作 $a$ 后的期望回报。
 
 - **数学定义**：
-  $$Q^{\pi}(s, a) = \mathbb{E}_{\pi}[G_t | s_t = s, a_t = a] = \mathbb{E}_{\pi}\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s, a_t = a\right]$$
+  $$Q^{π}(s, a) = \mathbb{E}_{π}[G_t | s_t = s, a_t = a] = \mathbb{E}_{π}[\sum_{k=0}^{\infty} γ^k r_{t+k+1} \Big| s_t = s, a_t = a]$$
 
-- **含义**：衡量在策略 $\pi$ 下，状态-动作对 $(s, a)$ 的"好坏程度"
+- **含义**：衡量在策略 $π$ 下，状态-动作对 $(s, a)$ 的"好坏程度"
 
 - **与V函数的关系**：
-  $$V^{\pi}(s) = \sum_{a \in \mathcal{A}} \pi(a|s) Q^{\pi}(s, a) = \mathbb{E}_{a \sim \pi(\cdot|s)}[Q^{\pi}(s, a)]$$
+  $$V^{π}(s) = \sum_{a \in \mathcal{A}} π(a|s) Q^{π}(s, a) = \mathbb{E}_{a \sim π(\cdot|s)}[Q^{π}(s, a)]$$
 
 ## 贝尔曼方程 & R/V/Q/A之间的关系
 
@@ -213,27 +232,27 @@ todo：两种对应方式：动作是token vs 动作是序列
 在概率环境中，贝尔曼方程描述了价值函数之间的递归关系：
 
 **V函数的贝尔曼方程**：
-$$V^{\pi}(s) = \sum_{a \in \mathcal{A}} \pi(a|s) \sum_{s' \in \mathcal{S}} P(s'|s, a) \left[R(s, a, s') + \gamma V^{\pi}(s')\right]$$
+$$V^{π}(s) = \sum_{a \in \mathcal{A}} π(a|s) \sum_{s' \in \mathcal{S}} P(s'|s, a) [R(s, a, s') + γ V^{π}(s')]$$
 
 **Q函数的贝尔曼方程**：
-$$Q^{\pi}(s, a) = \sum_{s' \in \mathcal{S}} P(s'|s, a) \left[R(s, a, s') + \gamma \sum_{a' \in \mathcal{A}} \pi(a'|s') Q^{\pi}(s', a')\right]$$
+$$Q^{π}(s, a) = \sum_{s' \in \mathcal{S}} P(s'|s, a) [R(s, a, s') + γ \sum_{a' \in \mathcal{A}} π(a'|s') Q^{π}(s', a')]$$
 
 **关系总结**：
-- $Q^{\pi}(s, a) = \mathbb{E}_{s' \sim P(\cdot|s,a)}[R(s, a, s') + \gamma V^{\pi}(s')]$
-- $V^{\pi}(s) = \mathbb{E}_{a \sim \pi(\cdot|s)}[Q^{\pi}(s, a)]$
-- $A^{\pi}(s, a) = Q^{\pi}(s, a) - V^{\pi}(s)$
+- $Q^{π}(s, a) = \mathbb{E}_{s' \sim P(\cdot|s,a)}[R(s, a, s') + γ V^{π}(s')]$
+- $V^{π}(s) = \mathbb{E}_{a \sim π(\cdot|s)}[Q^{π}(s, a)]$
+- $A^{π}(s, a) = Q^{π}(s, a) - V^{π}(s)$
 
 ### 确定性环境中的简化形式
 
 在确定性环境中，状态转移是确定的，贝尔曼方程简化为：
 
 **V函数的贝尔曼方程**：
-$$V^{\pi}(s) = \sum_{a \in \mathcal{A}} \pi(a|s) \left[R(s, a) + \gamma V^{\pi}(f(s, a))\right]$$
+$$V^{π}(s) = \sum_{a \in \mathcal{A}} π(a|s) [R(s, a) + γ V^{π}(f(s, a))]$$
 
 其中 $s' = f(s, a)$ 是确定性的状态转移函数。
 
 **Q函数的贝尔曼方程**：
-$$Q^{\pi}(s, a) = R(s, a) + \gamma \sum_{a' \in \mathcal{A}} \pi(a'|s') Q^{\pi}(s', a')$$
+$$Q^{π}(s, a) = R(s, a) + γ \sum_{a' \in \mathcal{A}} π(a'|s') Q^{π}(s', a')$$
 
 其中 $s' = f(s, a)$。
 
@@ -246,13 +265,13 @@ $$Q^{\pi}(s, a) = R(s, a) + \gamma \sum_{a' \in \mathcal{A}} \pi(a'|s') Q^{\pi}(
   
   其中 $r_k$ 是对第 $k$ 个token或整个序列的奖励
 
-- **价值V**：$V^{\pi}(s)$ 表示从当前文本序列 $s$ 开始的期望回报
-  $$V^{\pi}([x_1, ..., x_t]) = \mathbb{E}_{\pi}[G_t | \text{当前序列}]$$
+- **价值V**：$V^{π}(s)$ 表示从当前文本序列 $s$ 开始的期望回报
+  $$V^{π}([x_1, ..., x_t]) = \mathbb{E}_{π}[G_t | \text{当前序列}]$$
 
-- **Q函数**：$Q^{\pi}(s, a)$ 表示在当前序列 $s$ 下生成token $a$ 后的期望回报
-  $$Q^{\pi}([x_1, ..., x_t], x_{t+1}) = \mathbb{E}_{\pi}[G_t | \text{当前序列}, \text{下一个token}]$$
+- **Q函数**：$Q^{π}(s, a)$ 表示在当前序列 $s$ 下生成token $a$ 后的期望回报
+  $$Q^{π}([x_1, ..., x_t], x_{t+1}) = \mathbb{E}_{π}[G_t | \text{当前序列}, \text{下一个token}]$$
 
-- **优势A**：$A^{\pi}(s, a) = Q^{\pi}(s, a) - V^{\pi}(s)$，衡量生成某个token相对于平均水平的优势
+- **优势A**：$A^{π}(s, a) = Q^{π}(s, a) - V^{π}(s)$，衡量生成某个token相对于平均水平的优势
 
 # 蒙特卡洛：估计V/A/Q
 
@@ -266,7 +285,7 @@ $$Q^{\pi}(s, a) = R(s, a) + \gamma \sum_{a' \in \mathcal{A}} \pi(a'|s') Q^{\pi}(
 
 通过采样多个episode，计算从状态 $s$ 开始的平均回报：
 
-$$\hat{V}^{\pi}(s) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
+$$\hat{V}^{π}(s) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
 
 其中 $G_t^{(i)}$ 是第 $i$ 个episode中从状态 $s$ 开始的回报。
 
@@ -274,7 +293,7 @@ $$\hat{V}^{\pi}(s) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
 
 类似地，通过采样估计Q函数：
 
-$$\hat{Q}^{\pi}(s, a) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
+$$\hat{Q}^{π}(s, a) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
 
 其中 $G_t^{(i)}$ 是第 $i$ 个episode中从状态-动作对 $(s, a)$ 开始的回报。
 
@@ -282,29 +301,29 @@ $$\hat{Q}^{\pi}(s, a) = \frac{1}{N} \sum_{i=1}^{N} G_t^{(i)}$$
 
 优势函数可以通过Q函数和V函数计算：
 
-$$\hat{A}^{\pi}(s, a) = \hat{Q}^{\pi}(s, a) - \hat{V}^{\pi}(s)$$
+$$\hat{A}^{π}(s, a) = \hat{Q}^{π}(s, a) - \hat{V}^{π}(s)$$
 
 或者直接通过采样计算：
 
-$$\hat{A}^{\pi}(s, a) = G_t - \hat{V}^{\pi}(s)$$
+$$\hat{A}^{π}(s, a) = G_t - \hat{V}^{π}(s)$$
 
-其中 $G_t$ 是从 $(s, a)$ 开始的回报，$\hat{V}^{\pi}(s)$ 是从状态 $s$ 的平均回报。
+其中 $G_t$ 是从 $(s, a)$ 开始的回报，$\hat{V}^{π}(s)$ 是从状态 $s$ 的平均回报。
 
 ## 蒙特卡洛策略梯度
 
 策略梯度方法通过直接优化策略参数来最大化期望回报。策略梯度定理给出：
 
-$$\nabla_{\theta} J(\theta) = \mathbb{E}_{\tau \sim \pi_{\theta}} \left[\sum_{t=0}^{T} \nabla_{\theta} \log \pi_{\theta}(a_t|s_t) \cdot G_t\right]$$
+$$\nabla_{\theta} J(\theta) = \mathbb{E}_{\tau \sim π_{\theta}} [\sum_{t=0}^{T} \nabla_{\theta} \log π_{\theta}(a_t|s_t) \cdot G_t]$$
 
-其中 $J(\theta) = \mathbb{E}_{\tau \sim \pi_{\theta}}[G_0]$ 是期望回报。
+其中 $J(\theta) = \mathbb{E}_{\tau \sim π_{\theta}}[G_0]$ 是期望回报。
 
 ### 使用优势函数
 
 引入优势函数可以减少方差：
 
-$$\nabla_{\theta} J(\theta) = \mathbb{E}_{\tau \sim \pi_{\theta}} \left[\sum_{t=0}^{T} \nabla_{\theta} \log \pi_{\theta}(a_t|s_t) \cdot A^{\pi}(s_t, a_t)\right]$$
+$$\nabla_{\theta} J(\theta) = \mathbb{E}_{\tau \sim π_{\theta}} [\sum_{t=0}^{T} \nabla_{\theta} \log π_{\theta}(a_t|s_t) \cdot A^{π}(s_t, a_t)]$$
 
-因为优势函数 $A^{\pi}(s, a) = Q^{\pi}(s, a) - V^{\pi}(s)$ 的期望为0，所以不会改变梯度，但可以减少方差。
+因为优势函数 $A^{π}(s, a) = Q^{π}(s, a) - V^{π}(s)$ 的期望为0，所以不会改变梯度，但可以减少方差。
 
 ## 在LLM中的对应
 
@@ -312,7 +331,7 @@ $$\nabla_{\theta} J(\theta) = \mathbb{E}_{\tau \sim \pi_{\theta}} \left[\sum_{t=
 
 ### 采样完整序列
 
-1. **生成完整序列**：给定prompt，使用当前策略 $\pi_{\theta}$ 生成多个完整序列
+1. **生成完整序列**：给定prompt，使用当前策略 $π_{\theta}$ 生成多个完整序列
 2. **计算回报**：对每个序列计算奖励 $r$（可能只在序列结束时给出）
 3. **估计价值**：通过多个样本的平均值估计价值函数
 
@@ -353,9 +372,9 @@ GRPO（Group Relative Policy Optimization）是一种在简化场景下的蒙特
 
 标准的策略梯度方法使用优势函数：
 
-$$\nabla_{\theta} J(\theta) = \mathbb{E}_{s \sim \rho^{\pi}, a \sim \pi_{\theta}} \left[\nabla_{\theta} \log \pi_{\theta}(a|s) \cdot A^{\pi}(s, a)\right]$$
+$$\nabla_{\theta} J(\theta) = \mathbb{E}_{s \sim \rho^{π}, a \sim π_{\theta}} [\nabla_{\theta} \log π_{\theta}(a|s) \cdot A^{π}(s, a)]$$
 
-其中 $\rho^{\pi}$ 是状态分布。
+其中 $\rho^{π}$ 是状态分布。
 
 ### GRPO的优势估计
 
@@ -377,7 +396,7 @@ $$\hat{A}(s_t, a_t) = r_i - \bar{r}$$
 
 GRPO的目标函数可以写为：
 
-$$L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} \left[\mathbb{E}_{\{\tau_i\}_{i=1}^{K} \sim \pi_{\theta}} \left[\frac{1}{K} \sum_{i=1}^{K} \sum_{t=0}^{T_i} \log \pi_{\theta}(a_t^{(i)}|s_t^{(i)}) \cdot (r_i - \bar{r})\right]\right]$$
+$$L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} [\mathbb{E}_{\{\tau_i\}_{i=1}^{K} \sim π_{\theta}} [\frac{1}{K} \sum_{i=1}^{K} \sum_{t=0}^{T_i} \log π_{\theta}(a_t^{(i)}|s_t^{(i)}) \cdot (r_i - \bar{r})]]$$
 
 其中：
 - $\mathcal{D}$ 是prompt分布
@@ -390,7 +409,7 @@ $$L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} \left[\mathbb{E}_{\{\tau_i\
 
 对参数 $\theta$ 求梯度：
 
-$$\nabla_{\theta} L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} \left[\mathbb{E}_{\{\tau_i\}_{i=1}^{K} \sim \pi_{\theta}} \left[\frac{1}{K} \sum_{i=1}^{K} \sum_{t=0}^{T_i} \nabla_{\theta} \log \pi_{\theta}(a_t^{(i)}|s_t^{(i)}) \cdot (r_i - \bar{r})\right]\right]$$
+$$\nabla_{\theta} L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} [\mathbb{E}_{\{\tau_i\}_{i=1}^{K} \sim π_{\theta}} [\frac{1}{K} \sum_{i=1}^{K} \sum_{t=0}^{T_i} \nabla_{\theta} \log π_{\theta}(a_t^{(i)}|s_t^{(i)}) \cdot (r_i - \bar{r})]]$$
 
 ### 关键特性
 
@@ -405,7 +424,7 @@ $$\nabla_{\theta} L^{GRPO}(\theta) = \mathbb{E}_{s \sim \mathcal{D}} \left[\math
 |------|------|-----|
 | 价值估计方法 | 蒙特卡洛（组内比较） | 时序差分（价值函数） |
 | 基线 | 组内平均奖励 | 价值函数 $V(s)$ |
-| 优势估计 | $\hat{A} = r_i - \bar{r}$ | $\hat{A} = r + \gamma V(s') - V(s)$ |
+| 优势估计 | $\hat{A} = r_i - \bar{r}$ | $\hat{A} = r + γ V(s') - V(s)$ |
 | 适用场景 | 确定性环境，序列级奖励 | 一般MDP，即时奖励 |
 | 训练复杂度 | 较低（无需价值网络） | 较高（需要价值网络） |
 
