@@ -285,7 +285,7 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
 
 总结：**GRPO的优势A，本质是把prompt当成起始状态s，把整个response当成一个动作a，以同一个prompt的多个rollout作为样本池，用蒙特卡洛法估计出的优势A**
 
-# 策略梯度定理
+# 目标函数：策略梯度法
 
 ## RL的目标函数
 RL的目标函数为： $J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)]$  
@@ -297,6 +297,11 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)]$
 ```math
 \nabla_θ J(θ)=\mathbb{E}_{τ \sim π_θ} [\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) \cdot G(τ)]
 ```
+相应地，我们用右边对应的原函数 $\hat{J}(θ)$  ：
+```math
+\hat{J}(θ)=\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) G(τ)]
+```
+来代替真正的目标函数 $J(θ)$  用来实际做优化。
 
 > 推导：  
 > - 第一步：把期望展开为积分形式：  
@@ -329,7 +334,7 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)]$
 > ```
 > 其中 $\log P(s_0)$ 和 $\log P(s_{t+1}|s_t, a_{t+1})$ 因为都不含参数θ，因此对θ求导时会被消去  
 >
-> - 第四部：带入
+> - 第四步：带入
 > 
 > ```math
 > \begin{aligned}
@@ -337,17 +342,35 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)]$
 > & = \mathbb{E}_{τ \sim π_θ}[\nabla_θ \log π_θ(τ) G(τ)] \\
 > & = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G(τ)]
 > \end{aligned}
+>```
+> 
+> - 第五步：新的目标函数 $\hat{J}(θ)$  
+> 第四步中，右边对应的原函数其实不是 $J(θ)$ ，而是另一个原函数  $\hat{J}(θ)$
+> ```math
+> \hat{J}(θ)=\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) G(τ)]
 > ```
 
-此外，策略梯度定理中的 $G(τ)$ 换成一些其他式子也是成立的，例如 $G_t, Q(s,a), A(s,a)$ 但证明过程很麻烦，直接给出结论（其中换成优势 $A(s,a)$ 的就是GRPO/PPO中使用的形式）。  
+注解：
+- 为什么要做这么麻烦的变化？
+  - 因为神经网络中没有softmax归一化的logits，天然就是 $\log π_θ(a_{t+1}|s_t)$ 的形式。
+  - 例：n个候选token的logits $a_1, ..., a_n$，通过softmax转换为概率 $p_i = \frac{\exp(a_i)}{\sum \exp (a_i)}$，反过来 $a_i = \log p_i $。（严格来说是 $a_i = \log p_i + C$，C对所有 $a_i$ 是常数。但softmax有平移不变性，C可以视为0消去）
+- 目标函数究竟是 $J(θ)$ 还是 $\hat{J}(θ)$？它们是一个函数吗？
+  - 它们不是一个函数
+  - 但是恰巧 $\hat{J}(θ)$ 和原本的目标 $J(θ)$ 求导结果相同（意味着对参数的更新效果相同）
+  - 因此我们用 $\hat{J}(θ)$ 来替代真正的 $J(θ)$ 作为目标函数（这种技巧称为代理目标函数）
 
-## 策略梯度定理的其他形式
+## 策略梯度定理的优势A形式
+策略梯度定理中的 $G(τ)$ 换成 $G_t, Q(s,a), A(s,a)$ 也成立，但证明过程很麻烦（此处略过）。其中换成 **$A(s,a)$** 就是GRPO/PPO使用的公式：  
+
 ```math
 \begin{aligned}
-\nabla_θ J(θ)
-& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G(τ)] \\
-& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G_t] \\
-& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) Q(s_t, a_{t+1})] \\
-& = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
+\nabla_θ J(θ) = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
 \end{aligned}
 ```
+相应的代理目标函数 $\hat{J}(θ)$ ：
+```math
+\hat{J}(θ) = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
+```
+
+
+## 
