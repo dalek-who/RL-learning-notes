@@ -270,7 +270,7 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
   - 策略 $π(a|s)$： LLM生成response y的概率 $P(y | x)$
   - 环境的随机性 $P(s',a'|s,a)$：环境是确定的，没有随机性
 
-蒙特卡洛估计：
+**蒙特卡洛估计**：
   - rollout：取一个prompt $x$，生成N个不同的response，对应n种不同的动作
     - 记 $y^i$ 为第i个rollout， $r^i$ 为对应的奖励
   - 估计V、Q、A：
@@ -279,8 +279,75 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
     - $\hat{Q}^π(x, y^i)$：因为每个 $y^i$ 是唯一的，故 $\hat{Q}^π(x,y)=\frac{\sum_{包含(x,y)的τ} G_t}{N(x,y)} = \frac{r^i}{1}=r^i$，即奖励 $r^i$ 本身
     - $\hat{A}^π(x, y^i) = \hat{Q}^π(x, y^i) - \hat{V}^π(x) = r^i - μ$
 
-对比GRPO中的优势：$A(x, y^i) = \frac{ r^i - μ}{σ}$ ，可以看出就是蒙特卡洛法的 $\hat{A}^π(x, y^i)$ 
-  - 唯一的差别是分母 σ，相当于是为了控制方差范围做的scale（蒙特卡洛法本来就有方差大的缺点），属于trick，不影响本质
+观察GRPO公式中的优势： $A(x, y^i) = \frac{ r^i - μ}{σ}$  ，可以发现就是蒙特卡洛的 $\hat{A}^π(x, y^i)$ 
+  - 唯一的差别是分母 σ，相当于是为了控制方差范围做的scale（蒙特卡洛本来就有方差大的缺点），属于trick，不影响本质
   - 这里也能看出为什么计算 $A(x, y^i)$ 必须基于相同的prompt：因为 $V^π(s)$ 必须基于同一个起始状态s计算才有意义（这里是prompt x）
 
 总结：**GRPO的优势A，本质是把prompt当成起始状态s，把整个response当成一个动作a，以同一个prompt的多个rollout作为样本池，用蒙特卡洛法估计出的优势A**
+
+# 策略梯度定理
+
+## RL的目标函数
+RL的目标函数为： $J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)]$  
+其物理含义为：极大化轨迹的期望gain $G(τ)$。（注：如果是梯度下降，则目标函数取反变成 $-J(θ)$ 即为损失函数）
+- $π_θ(a|s)$ 是策略，其中θ是待优化的参数（例如对于LLM，θ是模型权重，$π_θ$可以是第t个token的生成概率 $π_θ(y_{t}|x, y_{1:t-1})$）
+- $τ \sim π_θ$ 是从 $π_θ$ 采样出的轨迹（例如LLM产生的token序列和相应reward）
+
+## 策略梯度定理
+```math
+\nabla_θ J(θ)=\mathbb{E}_{τ \sim π_θ} [\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) \cdot G(τ)]
+```
+
+> 推导：  
+> - 第一步：把期望展开为积分形式：  
+> ```math
+> J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)] = \int_τ π_θ(τ) G(τ) d τ
+> ```
+> 
+> - 第二步：求导，将导数转换为另一个东西的期望  
+> 其中使用到变形 $\nabla_θ \log π_θ(τ) = \frac{\nabla_θ π_θ(τ)}{π_θ(τ)} \rightarrow \nabla_θ π_θ(τ) = π_θ(τ) \cdot \nabla_θ \log π_θ(τ)$
+> 
+> ```math
+> \begin{aligned}
+> \nabla_θ J(θ)
+> & = \int_τ \nabla_θ π_θ(τ) G(τ) d τ \\
+> & = \int_τ π_θ(τ) \nabla_θ \log π_θ(τ) G(τ) d τ \qquad (\text{where} \ \nabla_θ \log π_θ(τ) = \frac{\nabla_θ π_θ(τ)}{π_θ(τ)} )\\
+> & = \mathbb{E}_{τ \sim π_θ}[\nabla_θ \log π_θ(τ) G(τ)]
+> \end{aligned}
+> ```
+>
+> - 第三步：基于马尔科夫性展开 $π_θ(τ)$
+>
+> ```math
+> \begin{aligned}
+> π_θ(τ) & = P(s_0) \cdot \prod_{t=1}^{\infty} π_θ(a_{t+1}|s_t) \cdot P(s_{t+1}|s_t, a_{t+1}) \\
+> \log π_θ(τ) & = \log P(s_0) + \sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) + \sum_{t=1}^{\infty} \log P(s_{t+1}|s_t, a_{t+1}) \\
+> \nabla_θ \log π_θ(τ)
+> & = \nabla_θ \log P(s_0) + \sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) + \sum_{t=1}^{\infty} \nabla_θ \log P(s_{t+1}|s_t, a_{t+1}) \\
+> & = \sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t)
+> \end{aligned}
+> ```
+> 其中 $\log P(s_0)$ 和 $\log P(s_{t+1}|s_t, a_{t+1})$ 因为都不含参数θ，因此对θ求导时会被消去  
+>
+> - 第四部：带入
+> 
+> ```math
+> \begin{aligned}
+> \nabla_θ J(θ)
+> & = \mathbb{E}_{τ \sim π_θ}[\nabla_θ \log π_θ(τ) G(τ)] \\
+> & = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G(τ)]
+> \end{aligned}
+> ```
+
+此外，策略梯度定理中的 $G(τ)$ 换成一些其他式子也是成立的，例如 $G_t, Q(s,a), A(s,a)$ 但证明过程很麻烦，直接给出结论（其中换成优势 $A(s,a)$ 的就是GRPO/PPO中使用的形式）。  
+
+## 策略梯度定理的其他形式
+```math
+\begin{aligned}
+\nabla_θ J(θ)
+& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G(τ)] \\
+& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G_t] \\
+& = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) Q(s_t, a_{t+1})] \\
+& = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
+\end{aligned}
+```
