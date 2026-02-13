@@ -43,7 +43,7 @@
 - 奖励r：
   - t时刻的奖励 $r_t$：第t轮回复的奖励（有些方法有中间奖励），如果t是最后一轮则对应终局奖励
 - 策略π：
-  - LLM生成第t个response的概率 $P(y_t | x_1, y_1, ..., x_{t-1}, y_{t-1}, x_t)$
+  - LLM生成第t个response的概率 $P(y_t | x_1, y_1, ..., x_{t-1}, y_{t-1}, y_t)$
  
 ## 环境：确定性环境 & 概率环境
 
@@ -717,8 +717,8 @@ $$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \
 ```math
 \begin{aligned}
 J(θ) 
-&= \mathbb{E}_{x \sim D(x), τ \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x_t, y_{<t})}{π_θ(y_t|x_t, y_{<t})_{.detach}} \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x_t, y_{i,<t})}{π_θ(y_{i,t}|x_t, y_{i,<t})_{.detach}} \right]
+&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_θ(y_t|x, y_{<t})_{.detach}} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \right]
 \end{aligned}
 ```
 其中单个token $y_{i,t}$ 的优势： 
@@ -728,8 +728,8 @@ $$A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
-&= \mathbb{E}_{x \sim D(x), τ \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x_t, y_{<t})}{π_θ(y_t|x_t, y_{<t})_{.detach}} \nabla_θ \log π_θ(y_t|x_t, y_{<t})  \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x_t, y_{i,<t})}{π_θ(y_{i,t}|x_t, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_t|x_t, y_{<t}) \right]
+&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_θ(y_t|x, y_{<t})_{.detach}} \nabla_θ \log π_θ(y_t|x, y_{<t})  \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_t|x, y_{<t}) \right]
 \end{aligned}
 ```
 
@@ -738,6 +738,10 @@ $$A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}
 - $π_{old}$：为了把on-policy变成off-policy以节约rollout成本，需要使用重要性采样
 - clip操作：off-policy情况下为了防止 $π_{old}$ 和 $π_θ$ 差距过大，导致训练不稳定
 - KL散度：为了防止RL训练后的 $π_θ$ 和其最初始值 $π_{ref}$ 偏离太远，导致灾难性遗忘
+
+$\frac{1}{|y_i|}$ 在公式中的位置？
+- GRPO公式的常见写法中，$\frac{1}{|y_i|}$ 不出现在优势 $A$ 里，而出现在 $\frac{1}{|y_i|} \sum_{i=1}^{|y_i|}$ 位置
+- 两种写法是等价的，我的写法更本质： $\frac{1}{|y_i|}$ 来自于严格推导出的单个token的优势
 
 公式中 $\frac{π_θ}{π_{θ.detach}}$ 为什么不移除？
 - 其反映了RL实质的训练过程：从 $π_{θ.detach}$ rollout，从 $π_θ$ 更新参数，两者采用不同的部署框架（而且数值经常有差异，训练-推理不一致是RL中一个头疼的问题）
@@ -764,3 +768,60 @@ on-policy版本的GRPO，目标函数是0吗？
     - 也就是说，优势和为0只是“临时”的，如果我们永远从固定策略中rollout，下个时刻优势和就不是0了
     - 之所以每次目标函数的优势和为0，是因为on-policy每次都重新换策略
     - 因此on-policy中目标函数一直是0，但梯度不是0
+
+# 拓展：PPO和GSPO
+
+有了以上GRPO最本质的公式，可以很容易拓展出PPO和GSPO的公式
+
+### PPO：用网络估计优势A
+
+PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：
+
+$A_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})$
+- $r$ 是最终response
+- $V_θ(s_t = x+y_{<t})$ 是一个估计状态 $s_t = x+y_{<t}$ 的神经网络。
+ 
+价值网络 $V_θ(x+y_{<t})$ 的形式，与LLM计算句子概率是类似的：$π_θ(x+y_{<t})$ ，因此在实现上可以和 $π_θ(x+y_{<t})$ 共用相同的LLM，只是在输出时换用不同的head。
+
+> 以上只是PPO最核心的思想。更多细节就不展开了（例如V如何训练、用广义优势估计GAE计算A）
+
+PPO与GRPO比较：
+- GRPO的A直接统计得到，本质是蒙特卡洛；PPO的A用网络估计，本质是时序差分（时序差分是RL中另一大类方法，这里不做探讨）
+- PPO和GRPO的训练效果：PPO低方差、高偏差；GRPO高方差、低偏差
+  - 如何理解？
+  - PPO低方差：用神经网络估计A，本质是用大量数据的滑动平均，波动比GRPO每次采样小
+  - PPO高偏差：（1）网络不一定有能力拟合真实的A；（2）训练过程中，网络可能还未收敛
+
+### GSPO：把整个response作为一个大动作
+
+如果把整个response $y_i$ 视为一个完整动作，得到的就是GSPO。
+
+目标函数：
+
+```math
+\begin{aligned}
+J(θ) 
+&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ A_{y} \cdot \frac{π_θ(y|x)}{π_θ(y|x)_{.detach}} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[  A_{y_{i}} \cdot \frac{π_θ(y_{i}|x)}{π_θ(y_{i}|x)_{.detach}} \right]
+\end{aligned}
+```
+其中完整response $y_{i}$ 的优势： 
+$$A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}$$
+
+它去掉了GRPO中每个token优势相等的假设。
+
+> 注：
+> - on-policy下GSPO和GRPO是完全等价的，因为 $\frac{π_θ}{π_{θ.detach}}$ 都是1.   
+> - off-policy下把 $π_{θ.detach}$ 换成 $π_{old}$，两者就不相等了。
+
+# 重要性采样
+
+前面已经介绍了重要性采样。这里将更深入探讨重要性采样与GRPO，乃至LLM知识蒸馏和SFT的关系。本质上，它们只是从不同的分布中rollout。
+
+## on-policy：用 $π_{θ.detach}$ rollout
+
+## off-policy: 用模型的历史版本 $π_{old}$ rollout
+
+## LLM知识蒸馏：用另一个更强大的LLM rollout
+
+## SFT：从数据集的（prompt, response）分布rollout
