@@ -301,19 +301,34 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
   - 唯一的差别是分母 σ，这是为了控制方差范围做的scale（蒙特卡洛本来就有方差大的缺点），属于trick，不影响本质
   - 这里也能看出为什么计算 $A(x, y_i)$ 必须基于相同的prompt：因为 $V^π(s)$ 必须基于同一个起始状态s才有意义（这里是prompt x）
 
-## 单个token的优势A
+## token级建模：单个token的优势A
 
-以上介绍的是将完整response视为一个动作，计算出的优势A。但在GRPO中，优势A是针对每个token的。在引入一些假设的情况下，可以推导出每个token的优势A就是整个response的优势A。
+以上介绍的是将完整response视为一个动作，计算出的优势A。但在GRPO中，优势A是针对每个token的，以下将推导单个token的优势。
 
-- 问题：如果将一系列动作合并为一个“大动作”，则大动作的优势是多少？  
-- 结论：记单个动作的优势是 $A_i$ , “大动作”的总优势是 $A_{\text{total}}$ , 则 $A_{\text{total}} = A_1 + γ A_2 + γ^2 A_3 + ...$ 即折扣衰减后的优势之和
+### 形式化
+- 问题1：如果将一系列动作合并为一个“大动作”，则大动作的优势是多少？  
+  - 结论：记单个动作的优势是 $A_i$ , “大动作”的总优势是 $A_{\text{total}}$ , 则 $A_{\text{total}} = A_1 + γ A_2 + γ^2 A_3 + ...$ 即折扣衰减后的优势之和
+
+- 问题2：反过来，已知 “大动作”的总优势是 $A_{\text{total}}$ ，求每个动作的优势 $A_i$
+  - 引入假设：**每一步动作同等重要** （即一个轨迹上所有动作的优势 $A_i$ 相等）
+  - 结论：简单的等比数列求和，其中 $n$ 为轨迹τ上的动作数量
+
+```math
+A_i = 
+\begin{cases}
+\frac{1}{n} A_{\text{total}} & \text{if } γ = 1, \\[1em]
+\frac{(1-γ)}{1-γ^{n}} A_{\text{total}} & \text{if } γ \neq 1.
+\end{cases}
+```
+
+### 对应到LLM
 - 把每个token视为一个动作，则整个response就是一个大动作
-- 现在已知整个response的总优势 $A_{\text{total}}$ ，倒推每个token的优势 $A_i$
-- 引入两个假设：
-  - 假设1：令折扣因子γ=0（即每个token只关心自己）
-  - 假设2：每个token同等重要，即它们的优势相同
-- 在此基础上可以倒推出，每个token的优势 $A_i = A_{\text{total}}$
-  - 带入计算：$A_{\text{total}} = A_{\text{total}} + 0 \cdot A_{\text{total}} + 0 \cdot A_{\text{total}} + ...$
+- 已知整个response的总优势 $A_{\text{total}} = \frac{r-μ}{σ}$ ，倒推每个token的优势 $A_i$
+- 引入假设：response $y$ 中的每个token同等重要
+- 结果：
+  - γ=1，即无衰减：  $A_i = \frac{1}{|y|} A_{\text{total}} = \frac{1}{|y|} \cdot \frac{r-μ}{σ}$ ，其中 $|y|$ 是y的长度
+  - γ=0，即每个token只关心自己：  $A_i = A_{\text{total}} = \frac{r-μ}{σ}$ 
+- GRPO通常采用γ=1的设置
 
 
 ## 总结：GRPO的优势A的本质
