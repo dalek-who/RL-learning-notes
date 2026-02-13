@@ -748,32 +748,14 @@ $\frac{1}{|y_i|}$ 在公式中的位置？
 - 即使二者数值相等也不能移除，它们在计算图上有实际对应，移除后无法对 $π_θ$ 求导
 
 on-policy版本的GRPO，目标函数是0吗？
-- 如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)$ 确实等于0。但梯度 $J(θ)≠0$
-  - 因为 $A$ 是通过reward归一化得到的
-- 如何理解目标函数等于0，但梯度不等于0？
-  - 计算图的角度：虽然数值是0，但计算图中有 $π_θ(y|x)$ 节点，保证它会有梯度
-  - 动作的角度：把优势视为一种“效应”，虽然所有动作的“效应”之和是0，但单个动作的“效应”都不是0。而且这些效应更新的方向不是均衡的：好的动作会被加强，坏的动作会被削弱
-  - 数值的角度（随着训练动态更新）：当前优势的期望之和恰好是0，但策略更新后，如果恰好还是rollout出这些数据，在旧的策略视角下，期望之和就不是0了（虽然在新策略的视角下还是0）
-    - response空间无限的例子不容易理解，这里举一个有限的例子
-    - prompt：选择题，ABCD四选一，其中正确选项是C
-    - response：ABCD四个token其中之一
-    - 采样：采样20个response $\{y_1, ..., y_{20}\}$，每个选项一定会重复多次。选项的分布就是策略 $π_θ$
-    - 对20个response归一化，得到 $μ$ 和 $σ$，计算A，它们的和确实是0
-    - 梯度的方向：加强C。削弱ABD
-    - 参数更新后，会得到一个新策略 $π_θ^*$ ，采样20个新response $\{y'_1, ..., y'_{20}\}$
-    - 结果：$\{y'_1, ..., y'_{20}\}$ 中的正确选项C比 $\{y_1, ..., y_{20}\}$ 多
-    - 对20个新response归一化，得到 $μ'$ 和 $σ'$，计算A'，它们的和确实还是0
-      - 但A'之和为0是在 新策略 $π_θ^*$ 视角下的
-      - 在旧策略 $π_θ$ 视角下如果计算 $\{y'_1, ..., y'_{20}\}$ 的优势，应当使用旧的 $μ$ 和 $σ$ ，而不是新的 $μ'$ 和 $σ'$ ，这样算出的优势就不是0了
-    - 也就是说，优势和为0只是“临时”的，如果我们永远从固定策略中rollout，下个时刻优势和就不是0了
-    - 之所以每次目标函数的优势和为0，是因为on-policy每次都重新换策略
-    - 因此on-policy中目标函数一直是0，但梯度不是0
+- 因为 $A$ 是通过reward归一化得到的。如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)$ 确实等于0。但梯度 $J(θ)≠0$ 。后面章节会详细介绍为什么梯度不是0。
+
 
 # 拓展：PPO和GSPO
 
 有了以上GRPO最本质的公式，可以很容易拓展出PPO和GSPO的公式
 
-### PPO：用网络估计优势A
+## PPO：用网络估计优势A
 
 PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：
 
@@ -792,7 +774,7 @@ PPO与GRPO比较：
   - PPO低方差：用神经网络估计A，本质是用大量数据的滑动平均，波动比GRPO每次采样小
   - PPO高偏差：（1）网络不一定有能力拟合真实的A；（2）训练过程中，网络可能还未收敛
 
-### GSPO：把整个response作为一个大动作
+## GSPO：把整个response作为一个大动作
 
 如果把整个response $y_i$ 视为一个完整动作，得到的就是GSPO。
 
@@ -816,12 +798,126 @@ $$A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\le
 
 # 重要性采样
 
-前面已经介绍了重要性采样。这里将更深入探讨重要性采样与GRPO，乃至LLM知识蒸馏和SFT的关系。本质上，它们只是从不同的分布中rollout。
+前面已经介绍过重要性采样，而本章将进行更深入的探讨。
+
+基于重要性采样的公式： $\mathbb{E}_{x \sim p(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} \left[ \frac{p(x)}{q(x)} f(x) \right]$ ，我们可以从任意一个分布中rollout数据，来训练GRPO：
+
+$$\mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)} [G(y)] = \mathbb{E}_{x \sim D(x), y \sim q(y|x)} \left[ \frac{π_θ(y|x)}{q(y|x)} G(y) \right]$$
+
+- $π_θ(y|x)$ 是待训练的LLM
+- $q(y|x)$ 是用来rollout的数据分布（通常也是个LLM）
+
+当我们把用于rollout的 $q(y|x)$ 换成不同的分布，可以统一看待 on-policy GRPO、off-policy GRPO、LLM知识蒸馏，甚至SFT。
 
 ## on-policy：用 $π_{θ.detach}$ rollout
 
+前面推导GRPO的公式，用的就是on-policy。其中用于rollout的 $π_{θ.detach}$ ，对应了用vllm等推理专用框架部署的LLM，其参数值和$π_{θ}$ 相同。这些内容已经详细探讨过了。
+
+这里重点解释一个问题：on-policy GRPO中，为什么目标函数（优势之和）值是0，但梯度不是0。
+
+- 计算图的角度：虽然数值是0，但计算图中有 $π_θ(y|x)$ 节点，保证它会有梯度
+- 动作的角度：把优势视为一种“效应”，虽然所有动作的“效应”之和是0，但单个动作的“效应”都不是0。而且这些效应更新的方向不是均衡的：好的动作会被加强，坏的动作会被削弱
+- 数值的角度（随着训练动态更新）：当前优势的期望之和恰好是0，但策略更新后，如果恰好还是rollout出这些数据，在旧的策略视角下，期望之和就不是0了（虽然在新策略的视角下还是0）
+
+response空间无限的例子不容易理解，这里举一个有限的例子
+  - prompt：选择题，ABCD四选一，其中正确选项是C
+  - response：ABCD四个token其中之一
+  - 采样：采样20个response $\{y_1, ..., y_{20}\}$，每个选项一定会重复多次。选项的分布就是策略 $π_θ$
+  - 对20个response归一化，得到 $μ$ 和 $σ$，计算A，它们的和确实是0
+  - 梯度的方向：加强C。削弱ABD
+  - 参数更新后，会得到一个新策略 $π_θ^*$ ，采样20个新response $\{y'_1, ..., y'_{20}\}$
+  - 结果：$\{y'_1, ..., y'_{20}\}$ 中的正确选项C比 $\{y_1, ..., y_{20}\}$ 多
+  - 对20个新response归一化，得到 $μ'$ 和 $σ'$，计算A'，它们的和确实还是0
+    - 但A'之和为0是在 新策略 $π_θ^*$ 视角下的
+    - 在旧策略 $π_θ$ 视角下如果计算 $\{y'_1, ..., y'_{20}\}$ 的优势，应当使用旧的 $μ$ 和 $σ$ ，而不是新的 $μ'$ 和 $σ'$ ，这样算出的优势就不是0了
+  - 也就是说，优势和为0只是“临时”的，如果我们永远从固定策略中rollout，下个时刻优势和就不是0了
+  - 之所以每次目标函数的优势和为0，是因为on-policy每次都重新换策略
+  - 因此on-policy中目标函数一直是0，但梯度不是0
+
+
 ## off-policy: 用模型的历史版本 $π_{old}$ rollout
+
+GRPO公式中，更常见的是off-policy形式：
+
+
+```math
+\begin{aligned}
+J(θ) 
+&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right]
+\end{aligned}
+```
+
+它实际对应了这样的训练过程：
+- 在某一时刻，用于训练的 $π_θ$ 和用于推断的 $π_{old}$ 参数相同（但部署框架不同）
+  - 用推理模型$π_{old}$ rollout出 M*N 条数据
+  - 对于训练模型 $π_θ$ ，每次取 M 条数据用于更新梯度，一共更新 N 轮
+  - 最初始 $π_θ = π_{old}$ ，但参数 $π_θ$ 每轮都在更新，而 $π_{old}$ 一直保持不变，且两者相差越来越大
+  - 第N轮更新完后，使用 $π_θ$ 参数重新部署用于rollout的 $π_{old}$
+- 此时两者参数又相等了，开始下个 N 轮的训练
+
+训练时为什么不把 M*N 条数据一次全用掉？
+- 显存问题：推理框架（如vllm）比训练框架（如fsdp）显存占用少，如果rollout M\*N条数据能把显存跑满，训练用M\*N条数据一定会爆显存
+
+为什么不通过梯度累加，用M\*N条数据更新一次参数？
+- 没有必要，更新N次 vs 更新1次，前者更新频率更高，训练更快（但方差也更大）
+- 使用M条数据更新时，本身往往也用了梯度累加（即真实的batch size比M更小，现在的框架如verl可以自动分配实际batch size并自动累加到M）
+
+off-policy相比于on-policy是一种trade-off，能提升训练效率，代价是方差变大，训练更不稳定。
+> 某些教程中写off-policy是为了rollout一次训练多次，这个说法有些误导：并不是rollout出M条数据，每轮更新都用这M条，一共更新N次；而是一次rollout出M*N条数据，每次用M条，一共分N次用完
+
+### verl中对应的训练config（暂时不管evaluate）：
+- `data.train_batch_size`：一次选择多少个prompt来rollout
+- `actor_rollout_ref.rollout.n`: 一个prompt rollout出多少个response
+- `actor_rollout_ref.actor.ppo_mini_batch_size`：$π_θ$ 更新一次使用多少个prompt（以及相应的全部response）
+- `actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu`：在gpu上计算时实际的batch size（会通过梯度累加实现ppo_mini_batch_size）
+- `actor_rollout_ref.actor.use_dynamic_bsz`: 是否自动、动态设置ppo_micro_batch_size_per_gpu
+
+情况举例：
+- vllm一次选择 `train_batch_size` 个prompt，每个rollout出 `n` 个response，一共 `train_batch_size × n` 个response 
+- fsdp一次选择 `ppo_mini_batch_size` 个prompt（相应`ppo_mini_batch_size × n`个response）用于更新模型，一共更新 $\frac{\text{train\_batch\_size}}{\text{ppo\_mini\_batch\_size}}$ 轮
+- 如果未设置`use_dynamic_bsz`，则gpu实际使用`ppo_micro_batch_size_per_gpu`个prompt，并且累加到`ppo_mini_batch_size`完成一次梯度更新，一共累加 $\frac{\text{ppo\_mini\_batch\_size}}{\text{ppo\_micro\_batch\_size\_per\_gpu}}$ 轮
 
 ## LLM知识蒸馏：用另一个更强大的LLM rollout
 
+如果我们的 $π_{θ}(y|x)$ 是个弱LLM，而采样分布 $q(y|x)$ 是个强LLM，且我们始终从强LLM rollout并实时计算 $q(y|x)$ ，则对应了LLM知识蒸馏：用强模型生成的数据训练弱模型。
+
+这也是种极端版本的off-policy：用于采样的模型永远不变。
+
+> 这只是种理论做法。实际的知识蒸馏，通常是用强LLM rollout出大量数据，给弱模型SFT。
+
 ## SFT：从数据集的（prompt, response）分布rollout
+
+SFT其实也可以套到策略梯度+重要性采样的框架下。只不过场景特殊：
+
+- rollout采样过程：
+  - 采样数据 $x \sim D(x)$ ：从数据集采样 prompt $x$
+  - rollout $y \sim q(y|x)$ ：这样定义 $q(y,x)$ ，则采样出的 $y$ 有且仅有数据集中的gold response。
+  - 此结果等价于采样 $(x,y) \sim D(x,y)$
+```math
+q(y|x) = 
+\begin{cases}
+1  \qquad \text{如果y是数据集中的gold response} \\
+0 \qquad \text{otherwise.}
+\end{cases}
+```
+
+- RL建模：
+  - token级建模
+  - reward粒度：token级，生成gold token则为1，否则为0
+  - 折扣因子γ=0，即只看当前token reward
+  - 轨迹片段收益 $G_t = \sum_{i=0}^{|y|} γ^i r_{t+i} = r_t$
+    - 但因为只会rollout出gold response，所以实际上只有 $G_t=r_t=1$
+
+- 带入：
+  - $G_t$ 版本的导数（因此实际是REINFORCE而不是GRPO）：
+
+```math
+\begin{aligned}
+\nabla_θ J_θ
+&= \nabla_θ \mathbb{E}_{x \sim D(x), y \sim q(y|x, y)} \left[ \sum_{t=1}^{|y|} \frac{π_θ(y_t|x， y_{<t})}{q(y_t|x, y_{<t})} \cdot G_t \right] \\
+&= \mathbb{E}_{(x,y) \sim D(x,y)} \left[ \sum_{t=1}^{|y|} \frac{\nabla_θ  π_θ(y_t|x， y_{<t})}{1} \cdot 1 \right] \qquad 因为只会采样出 \text{gold} \ y \\
+\end{aligned}
+```
+
+可以发现该结果就是SFT监督学习的公式。
