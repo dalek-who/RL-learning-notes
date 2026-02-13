@@ -335,20 +335,19 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
 
 > 这也是为什么GSPO比GRPO更“自然”：GRPO额外引入了两个假设
 
-# 目标函数 & 对目标函数求导
+以上介绍了GRPO公式中优势 $A$ 的来源，接下来将介绍RL的目标函数，如何对目标函数求导，以及将RL目标函数和优势A组合，得到GRPO的公式。
 
-以上介绍了GRPO公式中优势 $A$ 的来源，接下来介绍GRPO的目标函数为什么长这样，以及如何对目标函数求导
+# RL的目标函数（原始形式）
 
-## RL的目标函数（原始形式）
 RL的目标函数为： $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)]$  
 
 > 该结果对任何强化学习都成立，无论一步决策还是多步决策、把token视为一个动作还是把完整response视为一个动作  
 > 以下默认将每个token视为一个动作，对应GRPO的结果
 
-### 物理含义：
+## 物理含义：
 - 极大化轨迹的期望gain $G(τ)$。（注：如果是梯度下降，则目标函数取反变成 $-J(θ)$ 即为损失函数）
 
-### 公式拆解：
+## 公式拆解：
 - $s_1 \sim D(s_1)$: 基于初始状态 $s_1$ 的分布 $D(s_1)$ 采样 $s_1$
   > 对应到LLM：在数据集 D 中采样 prompt $x$
 - $τ \sim π_θ(s_1)$：给定初始状态 $s_1$，通过策略 $π_θ(τ|s_1)$ 采样出完整轨迹 $τ$
@@ -370,12 +369,11 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s
 
   
 
-## 对目标函数求导 & 目标函数的变形
+# 对目标函数求导 & 目标函数的变形
 
-### 结论：
 此处先给结论，之后再做推导。该结论实际是【**策略梯度定理**】
 
-- 变形后“实际使用”的目标函数： 
+## 变形后“实际使用”的目标函数： 
 ```math
 \begin{aligned}
 J(θ) 
@@ -385,7 +383,7 @@ J(θ)
 \end{aligned}
 ```
 
-- 对目标函数求导：
+## 对目标函数求导：
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
@@ -395,7 +393,7 @@ J(θ)
 \end{aligned}
 ```
 
-> #### 如何理解 $π_θ(τ|s_1)_{.detach}$ ？
+> ### 如何理解 $π_θ(τ|s_1)_{.detach}$ ？
 > - detach指的就是pytorch中的detach操作，即把某个网络分离出来不计算梯度  
 > - 引入detach，是为了强行让 $π_θ(τ|s_1)$ 能计算梯度，后面会介绍。 $\frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}$ 类似于gumbel-softmax中 $\text{OneHot}(s) - s_{.detach} + s$，在计算图中不能省略
 > - $\frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}$ 本质上是一种**重要性采样**，下一章介绍。
@@ -407,11 +405,11 @@ J(θ)
 | 用处        | 计算梯度                  | rollout 和 evaluate                            |
 | 参数更新方式 | 梯度下降直接更新          | 将更新后的 $π_θ(τ\|s_1)$ 参数复制过来（即 detach）|
 
-> #### 如何理解两个“约等于≈”？
+> ### 如何理解两个“约等于≈”？
 > - 理论结果→实际计算图：把期望 $\mathbb{E}$ 变成采样求平均 $\frac{1}{M} \frac{1}{N} \sum_{M} \sum_{N}$，本身就有误差
 > - 实际计算图→数值结果：因为训练、推理框架的差异，$\frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}$ 可能不等于1
 
-> #### 策略梯度定理的两种写法
+> ### 策略梯度定理的两种写法
 > 很多教程中，策略梯度定理的写法更加简洁：   
 > $\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[G(τ) \nabla_θ \log π_θ(τ|s_1) \right]$  
 >   
@@ -419,9 +417,9 @@ J(θ)
 > $\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right]$
 
 
-### 公式推导
+# 公式推导
 
-#### 直接求导的困境
+## 直接求导的困境
 
 观察RL的目标函数 $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)]$ 
 - 该函数实际没办法“直接求导”
@@ -439,7 +437,7 @@ J(θ)
 
 以下先岔开一支，介绍机器学习中的两种目标函数，从而更好地理解这个目标函数为什么无法直接求导。
 
-#### 两种机器学习目标函数
+## 两种机器学习目标函数
 
 机器学习中有两种目标函数：
 - 参数θ在打分函数上： $J_θ = \mathbb{E}_{x \sim p(x)} [f_θ(x)]$
@@ -499,105 +497,181 @@ J(θ)
 
 > 下面将推导这个正确结果
 
-#### 推导：对带参数的采样 $p_θ(x)$ 求导
+## 推导：对带参数的采样 $p_θ(x)$ 求导
 
 - 问题：分布 $p_θ(x)$ 含参数，打分函数 $f(x)$ 不含参数，直接求导 $\nabla_θ f(x)=0$
 - 解决思路：把参数θ从分布挪到打分函数上
 - 常用做法：重参数化（例：VAE对高斯分布重参数化，gumbel-softmax对离散采样重参数化）
-- 此处借助重参数化+重要性采样，推导 $\nabla_θ J_θ$ 的公式 
+- 此处借助重参数化+重要性采样+对数导数技巧，推导 $\nabla_θ J_θ$ 的公式 
 
-两个数学技巧（这里直接当引理给出，不证明）
-##### 技巧1：“广义的”重参数化方法
+几个数学技巧（这里直接当引理给出）
+### 技巧1：“广义的”重参数化方法
+> 用途：把参数θ从分布挪到打分函数上  
 
 对于目标函数 $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)]$  
 如果我们能找到另一组无参数分布 $q(x)$ 和含参数的打分函数 $g_θ(x)$ ，使得：  
-$J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$  
+- $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$  
+- 分布 $p_θ(x)$ 和 打分函数 $g_θ(x)$ 使用同一组参数θ
 
 这样就把参数θ从分布转移到打分函数上了，从而能对 $J_θ$ 直接求导：  
 $\nabla_θ J_θ = \mathbb{E}_{x \sim q(x)} [ \nabla_θ g_θ(x)]$  
 
-> 之后会给出如何借助重要性采样，构造 $q(x)$ 和 $g_θ(x)$
+> **“广义的”重参数化**这个名字是我编的，没见过类似写法，但直觉上是对的  
+> 标准的重参数化方法不长这样，但和本文推导无关，这里就不介绍了  
 
-##### 技巧2：重要性采样（下一章会更详细介绍）
+### 技巧2：重要性采样（下一章会更详细探讨）
+> 用途：构造上面的 $q(x)$ 和 $g_θ(x)$
 
-## 策略梯度定理
-```math
-\nabla_θ J(θ)=\mathbb{E}_{τ \sim π_θ} [\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) \cdot G(τ)]
-```
-相应地，我们用右边对应的原函数 $\hat{J}(θ)$  ：
-```math
-\hat{J}(θ)=\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) G(τ)]
-```
-来代替真正的目标函数 $J(θ)$  用来实际做优化。
+- 需求：在用采样求期望 $\mathbb{E}_{x \sim p(x)} [f(x)]$ 时，如果从原始分布 $p(x)$ 采样 $x$ 较为困难，但从另一个分布 $q(x)$ 采样 $x$ 较为容易，如何用从 $q(x)$ 采样的 $x$ 估计在 $p(x)$ 上的期望？ 
+- 公式： $\mathbb{E}_{x \sim p(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} \left[ \frac{p(x)}{q(x)} f(x) \right]$
+> - 证明：$\mathbb{E}_{x \sim p(x)} [f(x)] = ∫ p(x)f(x)dx = ∫ q(x) \left[\frac{p(x)}{q(x)} f(x)\right]dx = \mathbb{E}_{x \sim q(x)} \left[ \frac{p(x)}{q(x)} f(x) \right]$
+> - LLM中的实际场景：
+>   - $x$ ：采样出的response
+>   - $p(x)$ ：用训练框架fsdp部署的LLM，用于计算梯度，效率低
+>   - $q(x)$ ：用推理框架vllm部署的LLM，用于rollout，效率高
+>   - 成本考量：从 $q(x)$ 中采样，计算概率 $q(x)$ 和 $p(x)$ ，加在一起的成本比直接从 $p(x)$ 中采样还低
+>   - 其中从 $p(x)$ 中采样 $x$ 成本很高，但给定采样好的 $x$ 计算它的概率 $p(x)$ 成本相对不高
+>   - 这也是投机解码的原理：用低成本LLM采样response，在高成本LLM上验证response的概率
 
-> 推导：  
-> - 第一步：把期望展开为积分形式：  
-> ```math
-> J(θ) = \mathbb{E}_{τ \sim π_θ}[G(τ)] = \int_τ π_θ(τ) G(τ) d τ
-> ```
-> 
-> - 第二步：求导，将导数转换为另一个东西的期望  
-> 其中使用到变形 $\nabla_θ \log π_θ(τ) = \frac{\nabla_θ π_θ(τ)}{π_θ(τ)} \rightarrow \nabla_θ π_θ(τ) = π_θ(τ) \cdot \nabla_θ \log π_θ(τ)$
-> 
-> ```math
-> \begin{aligned}
-> \nabla_θ J(θ)
-> & = \int_τ \nabla_θ π_θ(τ) G(τ) d τ \\
-> & = \int_τ π_θ(τ) \nabla_θ \log π_θ(τ) G(τ) d τ \qquad (\text{where} \ \nabla_θ \log π_θ(τ) = \frac{\nabla_θ π_θ(τ)}{π_θ(τ)} )\\
-> & = \mathbb{E}_{τ \sim π_θ}[\nabla_θ \log π_θ(τ) G(τ)]
-> \end{aligned}
-> ```
->
-> - 第三步：基于马尔科夫性展开 $π_θ(τ)$
->
-> ```math
-> \begin{aligned}
-> π_θ(τ) & = P(s_0) \cdot \prod_{t=1}^{\infty} π_θ(a_{t+1}|s_t) \cdot P(s_{t+1}|s_t, a_{t+1}) \\
-> \log π_θ(τ) & = \log P(s_0) + \sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) + \sum_{t=1}^{\infty} \log P(s_{t+1}|s_t, a_{t+1}) \\
-> \nabla_θ \log π_θ(τ)
-> & = \nabla_θ \log P(s_0) + \sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) + \sum_{t=1}^{\infty} \nabla_θ \log P(s_{t+1}|s_t, a_{t+1}) \\
-> & = \sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t)
-> \end{aligned}
-> ```
-> 其中 $\log P(s_0)$ 和 $\log P(s_{t+1}|s_t, a_{t+1})$ 因为都不含参数θ，因此对θ求导时会被消去  
->
-> - 第四步：带入
-> 
-> ```math
-> \begin{aligned}
-> \nabla_θ J(θ)
-> & = \mathbb{E}_{τ \sim π_θ}[\nabla_θ \log π_θ(τ) G(τ)] \\
-> & = \mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) G(τ)]
-> \end{aligned}
->```
-> 
-> - 第五步：新的目标函数 $\hat{J}(θ)$  
-> 第四步中，右边对应的原函数其实不是 $J(θ)$ ，而是另一个原函数  $\hat{J}(θ)$
-> ```math
-> \hat{J}(θ)=\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) G(τ)]
-> ```
+### 技巧3：对数导数技巧
+> 用途：有利于实际计算时的数值稳定性
 
-注解：
-- 为什么要做这么麻烦的变化？
-  - 因为神经网络中没有softmax归一化的logits，天然就是 $\log π_θ(a_{t+1}|s_t)$ 的形式。
-  - 例：n个候选token的logits $a_1, ..., a_n$，通过softmax转换为概率 $p_i = \frac{\exp(a_i)}{\sum \exp (a_i)}$，反过来 $a_i = \log p_i $。（严格来说是 $a_i = \log p_i + C$，C对所有 $a_i$ 是常数。但softmax有平移不变性，C可以视为0消去）
-- 目标函数究竟是 $J(θ)$ 还是 $\hat{J}(θ)$？它们是一个函数吗？
-  - 它们不是一个函数
-  - 但是恰巧 $\hat{J}(θ)$ 和原本的目标 $J(θ)$ 求导结果相同（意味着对参数的更新效果相同）
-  - 因此我们用 $\hat{J}(θ)$ 来替代真正的 $J(θ)$ 作为目标函数（这种技巧称为代理目标函数）
+- 公式：$\nabla f(x) = f(x) \nabla \log f(x)$
 
-## 策略梯度定理的优势A形式
-策略梯度定理中的 $G(τ)$ 换成 $G_t, Q(s,a), A(s,a)$ 也成立，但证明过程很麻烦（此处略过）。其中换成 **$A(s,a)$** 就是GRPO/PPO使用的公式：  
+> - 证明： $\nabla \log f(x) = \frac{\nabla f(x)}{f(x)} \Rightarrow f(x) = f(x) \nabla \log f(x)$
+
+
+### 整合 & 公式推导
+
+首先依据重参数化，我们要找到另一组无参数分布 $q(x)$ 和含参数的打分函数 $g_θ(x)$ ，使得：  
+- $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$  
+- 分布 $p_θ(x)$ 和 打分函数 $g_θ(x)$ 使用同一组参数θ
+
+这样的 $q(x)$ 和 $g_θ(x)$ 可以借助重要性采样来构造：
+- $q(x) = p_θ(x)_{.detach}$，其中detach后就相当于不含参数了
+- $g_θ(x) = \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x)$
+
+$q(x)$ 和 $g_θ(x)$ 显然满足条件：  
+$$J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim p_θ(x)_{.detach}} \left[ \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x) \right] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$$
+
+这样就成功把参数θ从分布转移到了打分函数上，可以正常求导了。
 
 ```math
 \begin{aligned}
-\nabla_θ J(θ) = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \nabla_θ \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
+\nabla_θ J_θ 
+&= \mathbb{E}_{x \sim q(x)} [ \nabla_θ g_θ(x)] \\
+&= \mathbb{E}_{x \sim p_θ(x)_{.detach}} \left[ \frac{ \nabla_θ p_θ(x)}{p_θ(x)_{.detach}} f(x) \right] \\
+&= \mathbb{E}_{x \sim p_θ(x)_{.detach}} \left[ \frac{ p_θ(x)}{p_θ(x)_{.detach}} f(x) \nabla_θ \log p_θ(x) \right]  \qquad 对数导数技巧 \\
 \end{aligned}
 ```
-相应的代理目标函数 $\hat{J}(θ)$ ：
+
+对应到RL的场景：
+- 样本 $x$： 初始状态 $s_1$, 轨迹 $τ$
+- 有参数概率采样 $x \sim p_θ(x)$ ：从数据集采样$s_1 \sim D(s_1)$ （这部分没有参数）, 从策略采样 $τ \sim π_θ(τ|s_1)$
+- 无参数打分函数 $f(x)$ ： 轨迹收益 $G(τ)$
+
+带入：
 ```math
-\hat{J}(θ) = \mathbf{\mathbb{E}_{τ \sim π_θ}[\sum_{t=1}^{\infty} \log π_θ(a_{t+1}|s_t) A(s_t, a_{t+1})]}
+\begin{aligned}
+J(θ) 
+&= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \right] \qquad 理论结果 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ)]  \qquad 数值结果
+\end{aligned}
 ```
 
+```math
+\begin{aligned}
+\nabla_θ J(θ) 
+&= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right] \qquad 理论结果 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1)\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \qquad 数值结果
+\end{aligned}
+```
 
-## 
+这就是**策略梯度定理**的详细推导版本
+
+# 实际常用形式
+
+## 把轨迹展开为动作
+
+前面的策略梯度定理中使用的是轨迹τ的概率 $π_θ(τ|s_1)$ ，实际应用中通常会进一步展开为每个动作的概率 $π_θ(a_t|s_t)$ 。
+
+在确定性环境下：
+```math
+\begin{aligned}
+\nabla_θ \log π_θ(τ|s_1)
+&= \nabla_θ \log \prod_{t=1}^{|τ|} π_θ(a_t|s_t)  \qquad |τ|代表轨迹的步骤数 \\
+&= \sum_{i=t}^{|τ|}  \nabla_θ \log π_θ(a_t|s_t)
+\end{aligned}
+```
+> 在非确定环境下也成立，但和LLM无关，这里不介绍了
+
+带入：
+```math
+\begin{aligned}
+\nabla_θ J(θ) 
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right] \\
+&≈ \mathbb{E}_{s_0 \sim D(s_0), τ \sim π_θ(τ|s_0)} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
+\end{aligned}
+```
+
+> 这里只在求导版本 $\nabla J$ 下展开，目标函数 $J$ 没有log不能这么展开  
+> GRPO的目标函数实际是用 $\nabla J$ 倒推回去的一个“代理目标函数” $\hat{J}$  
+> $\hat{J}$ 和 $J$ 本质上不是同一个函数，但恰好 $\nabla J = \nabla \hat{J}$ ，且 $J$ 和 $\hat{J}$ 的极值点相同
+> 最后一步的约等于：如果忽略 $π_θ(τ|s_0)$ 和 $π_θ(τ|s_0)_{.detach}$ 的数值差异，可以做这种“形式简化”
+
+## 导数的变体：替换 $G(τ)$
+
+实际应用中，一般会把轨迹收益 $G(τ)$ 替换成别的东西，公式还是成立的。
+> 这部分的推理很复杂，就不管了。但公式看起来很符合直觉
+
+
+```math
+\begin{aligned}
+\nabla_θ J(θ)
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G_t(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} Q(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
+\end{aligned}
+```
+
+其中：
+- 替换成从第t步开始的轨迹片段收益 $G_t(τ)$ ：REINFORCE算法，$G_t(τ)$ 从实际数据中收集
+- 替换成Q函数 $Q(s_t, a_t)$ ：Actor-critic算法，Q函数用一个critic网络来计算
+- 替换成优势 $A(s_t, a_t)$ ：PPO/GRPO等现代方法。PPO用一个critic网络来计算，GRPO直接对数据归一化计算
+
+其中替换成优势A训练最稳定，因此现代方法一般使用A。
+公式理解：用优势A控制梯度的方向和大小
+- A>0：好动作，沿梯度方向走
+- A<0：坏动作，逆着梯度方向走
+- A>0且数值很大：非常好的动作，沿梯度方向走一大步
+
+> 这里也能看出为什么引入 $\nabla_θ \log π_θ(τ|s_1)$ 来代替 $\nabla_θ π_θ(τ|s_1)$ :
+> - 轨迹拆分成动作：通过log把动作概率相乘变成相加
+> - logits： $\log π_θ(a_t|s_t)$ 实际是每个动作的logits，而神经网络给每个token的打分在softmax之前天然就是logits，省略一步softmax有利于数值稳定
+> - 约分：$\frac{\nabla_θ π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} =\frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) ≈ \nabla_θ \log π_θ(τ|s_1)$ ，在不考虑训练-推理的数值差异时，可以约分
+
+## 目标函数的变体：动作优势之和
+
+如果把RL的目标函数从轨迹τ的收益 $G(τ)$ 改成动作优势之和:
+$$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \right]$$
+
+当折扣因子γ=1，即无衰减时：
+$$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|}A(s_t, a_t) \right]$$
+
+
+其导数恰好和对 $\mathbb{E}_{τ} [G(τ)]$ 求导的结果相同：
+$$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]$$
+
+> 以上是简化形式，完整形式是：
+> $$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \right]$$
+> $$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \nabla_θ \log π_θ(a_t|s_t) \right]$$
+> 如果忽略训练、推理的差异，即认为在数值上 $π_θ(a_t|s_t)=π_θ(a_t|s_t)_{.detach}$ ，得到的就是简化形式
+
+**这实际就是最简单版本的GRPO公式。**
+
+# 最简单版本的GRPO公式：
+考虑如下设置：
