@@ -688,5 +688,79 @@ $$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \
 
 **这实际就是最简单版本的GRPO公式。**
 
-# 最简单版本的GRPO公式：
-考虑如下设置：
+# 最简单版本的GRPO公式
+
+## 前提设置
+- token级建模，每个token是一个动作
+- 衰减因子γ=1
+- 每个token同等重要
+- 目标函数：极大化response中token优势之和的期望（此设置下等价于极大化轨迹收益）
+- 优势估计方式：用同一个prompt rollout出一批数据后，做蒙特卡洛估计
+- 不考虑KL散度
+- on-policy，即rollout出一批数据只用来更新一次梯度，用后即丢弃（因此没有旧策略 $π_{old}$ ）
+- 训练、推断的LLM用两个不同框架部署
+
+## 公式
+
+- 符号约定：
+  - 从数据集 $D(x)$ 采样 N 个prompt $x$  （为了简化公式，不引入角标）
+  - 为每个 $x$ rollout G 个response $\{y_i\}_{i=1}^G$
+  - $\{y_i\}_{i=1}^G$ 对应的reward为 $\{r_i\}_{i=1}^G$
+  - $y_i$ 长度为 $|y_i|$
+  - $y_{i,t}$ 为 $y_i$ 的第t个token，$y_{i,<t}$ 为$y_i$ 的第1,2,...,t-1个token
+  - $A_{y_{i,t}}$ 为token $y_{i,t}$ 的优势
+  - $π_θ$ 是训练框架（例如fsqp）部署的LLM，$π_{θ.detach}$ 是训练框架（例如vllm）部署的LLM
+  - 所有response $y_i$ 是从 $π_{θ.detach}$ rollout出来的
+
+- 目标函数：
+
+```math
+\begin{aligned}
+J(θ) 
+&= \mathbb{E}_{x \sim D(x), τ \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x_t, y_{<t})}{π_θ(y_t|x_t, y_{<t})_{.detach}} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x_t, y_{i,<t})}{π_θ(y_{i,t}|x_t, y_{i,<t})_{.detach}} \right]
+\end{aligned}
+```
+其中单个token $y_{i,t}$ 的优势： 
+$$A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关$$
+
+- 求导
+```math
+\begin{aligned}
+\nabla_θ J(θ) 
+&= \mathbb{E}_{x \sim D(x), τ \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x_t, y_{<t})}{π_θ(y_t|x_t, y_{<t})_{.detach}} \nabla_θ \log π_θ(y_t|x_t, y_{<t})  \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x_t, y_{i,<t})}{π_θ(y_{i,t}|x_t, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_t|x_t, y_{<t}) \right]
+\end{aligned}
+```
+
+## 讨论
+以上是GRPO公式**最本质**的部分。完整的GRPO只是加上了一些trick：
+- $π_{old}$：为了把on-policy变成off-policy以节约rollout成本，需要使用重要性采样
+- clip操作：off-policy情况下为了防止 $π_{old}$ 和 $π_θ$ 差距过大，导致训练不稳定
+- KL散度：为了防止RL训练后的 $π_θ$ 和其最初始值 $π_{ref}$ 偏离太远，导致灾难性遗忘
+
+公式中 $\frac{π_θ}{π_{θ.detach}}$ 为什么不移除？
+- 其反映了RL实质的训练过程：从 $π_{θ.detach}$ rollout，从 $π_θ$ 更新参数，两者采用不同的部署框架（而且数值经常有差异，训练-推理不一致是RL中一个头疼的问题）
+- 即使二者数值相等也不能移除，它们在计算图上有实际对应，移除后无法对 $π_θ$ 求导
+
+on-policy版本的GRPO，目标函数是0吗？
+- 如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)$ 确实等于0。但梯度 $J(θ)≠0$
+  - 因为 $A$ 是通过reward归一化得到的
+- 如何理解目标函数等于0，但梯度不等于0？
+  - 计算图的角度：虽然数值是0，但计算图中有 $π_θ(y|x)$ 节点，保证它会有梯度
+  - 动作的角度：把优势视为一种“效应”，虽然所有动作的“效应”之和是0，但单个动作的“效应”都不是0。而且这些效应更新的方向不是均衡的：好的动作会被加强，坏的动作会被削弱
+  - 数值的角度（随着训练动态更新）：当前优势的期望之和恰好是0，但策略更新后，如果恰好还是rollout出这些数据，在旧的策略视角下，期望之和就不是0了（虽然在新策略的视角下还是0）
+    - response空间无限的例子不容易理解，这里举一个有限的例子
+    - prompt：选择题，ABCD四选一，其中正确选项是C
+    - response：ABCD四个token其中之一
+    - 采样：采样20个response $\{y_1, ..., y_{20}\}$，每个选项一定会重复多次。选项的分布就是策略 $π_θ$
+    - 对20个response归一化，得到 $μ$ 和 $σ$，计算A，它们的和确实是0
+    - 梯度的方向：加强C。削弱ABD
+    - 参数更新后，会得到一个新策略 $π_θ^*$ ，采样20个新response $\{y'_1, ..., y'_{20}\}$
+    - 结果：$\{y'_1, ..., y'_{20}\}$ 中的正确选项C比 $\{y_1, ..., y_{20}\}$ 多
+    - 对20个新response归一化，得到 $μ'$ 和 $σ'$，计算A'，它们的和确实还是0
+      - 但A'之和为0是在 新策略 $π_θ^*$ 视角下的
+      - 在旧策略 $π_θ$ 视角下如果计算 $\{y'_1, ..., y'_{20}\}$ 的优势，应当使用旧的 $μ$ 和 $σ$ ，而不是新的 $μ'$ 和 $σ'$ ，这样算出的优势就不是0了
+    - 也就是说，优势和为0只是“临时”的，如果我们永远从固定策略中rollout，下个时刻优势和就不是0了
+    - 之所以每次目标函数的优势和为0，是因为on-policy每次都重新换策略
+    - 因此on-policy中目标函数一直是0，但梯度不是0
