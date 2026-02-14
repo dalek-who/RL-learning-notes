@@ -191,28 +191,20 @@ Q^π(s,a)
 **概率环境**：
 ```math
 \begin{aligned}
-% 1. V计算V
-V^π(s) & = \sum_{a} π(a|s) \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s') ] \\
-% 2. Q计算Q
-Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ \sum_{a'} π(a'|s') Q^π(s', a') ] \\
-% 3. 用Q计算V
-V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \\ 
-% 4. 用V计算Q 
-Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s')]
+V^π(s) & = \sum_{a} π(a|s) \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s') ] \qquad \text{1. V计算V} \\
+Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ \sum_{a'} π(a'|s') Q^π(s', a') ] \qquad \text{2. Q计算Q} \\
+V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \qquad \text{3. 用Q计算V} \\ 
+Q^π(s, a) & = \sum_{s', r} P(s', r|s, a) [ r + γ V^π(s')] \qquad \text{4. 用V计算Q}
 \end{aligned}
 ```
 
 **确定性环境**：去掉所有 $P(s',r|s,a)$
 ```math
 \begin{aligned}
-% 1. V计算V
-V^π(s) & = \sum_{a} π(a|s) [ r + γ V^π(s') ] \\
-% 2. Q计算Q
-Q^π(s, a) & = r + γ \sum_{a'} π(a'|s') Q^π(s', a') \\
-% 3. 用Q计算V
-V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \\ 
-% 4. 用V计算Q 
-Q^π(s, a) & = r + γ V^π(s')
+V^π(s) & = \sum_{a} π(a|s) [ r + γ V^π(s') ] \qquad \text{1. V计算V} \\
+Q^π(s, a) & = r + γ \sum_{a'} π(a'|s') Q^π(s', a') \qquad \text{2. Q计算Q} \\
+V^π(s) & = \sum_{a} π(a|s) Q^π(s, a) \qquad \text{3. 用Q计算V} \\ 
+Q^π(s, a) & = r + γ V^π(s') \qquad \text{4. 用V计算Q}
 \end{aligned}
 ```
 
@@ -253,7 +245,9 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
     - 对于每条这样的轨迹，截取从 $(S_t, A_{t}) = (s,a)$ 一直到结尾的轨迹片段，抽取其中的奖励 $r_{t}, r_{t+1}, ...$，计算该片段的gain： $G_t(S_t=s, A_t=a) = r_{t} + γ r_{t+1} + γ^2 r_{t+2} + ...$
     - 将所有这样轨迹的gain取平均： $\hat{Q}^π(s,a)=\frac{\sum_{包含(s,a)的τ} G_t (S_t=s, A_t=a)}{N(s, a)}$
   - 估计 $A^π(s,a)$ ：
-    - $\hat{A}^π(s,a) = \hat{Q}^π(s,a) - \hat{A}^π(s)$
+    - $$
+      \hat{A}^π(s,a) = \hat{Q}^π(s,a) - \hat{A}^π(s)
+      $$
 
 上述三个统计量 $\hat{V}^π, \hat{Q}^π, \hat{A}^π$ ，就是对 $V^π, Q^π, A^π$ 的估计。这个估计高方差、无偏差（与此相对，时序差分对 $V^π, Q^π, A^π$ 的估计是低方差、有偏差的。以后PPO中介绍，此处略）
 
@@ -283,10 +277,14 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
     - 结束状态 $s'$：prompt $x$ + response $y_i$
   - 包含 $s=x$ 的轨迹数量 $N(x)$：
     - 一共生成N个轨迹，每个轨迹的s都是prompt $x$
-    - $N(s)=N$
+    - $$
+      N(s)=N
+      $$
   - 包含 $(s,a)=(x,y_i)$ 的轨迹数量 $N(s, a)$：
     - 每个 (prompt, response) 对只出现一次
-    - $N(s, a)=1$
+    - $$
+      N(s, a)=1
+      $$
   - 轨迹片段的收益 $G_t(τ_i)$ ：
     - 在每一个轨迹 $τ_i$ 上，从第t步直到结束的收益 $G_t(τ_i) =r_{i,t} + γ r_{i,t+1} + γ^2 r_{i,t+2} + ...$
     - 因为只有一步动作、一个最终奖励，因此只有 $r_{i,1}=r_{i}$ ，不存在$r_{i,2}, r_{i,3}，...$
@@ -295,7 +293,9 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
 - 带入，估计V、Q、A：
   - $\hat{V}^π(x) = \hat{V}^π(s=x) = \frac{\sum_{包含x的τ_i} G_t (s=x)}{N(s=x)} = \frac{\sum_{i=1}^{N} r_i}{N} = μ$，即奖励 $r_1, ..., r_N$ 的平均值 $μ$
   - $\hat{Q}^π(x, y_i) = \hat{Q}^π(s=x, a=y_i)=\frac{\sum_{包含(x,y_i)的τ_i} G_t (s=x, a=y_i)}{N(s=x,a=y_i)} = \frac{r_i}{1}=r_i$，即奖励 $r_i$ 本身
-  - $\hat{A}^π(x, y_i) = \hat{Q}^π(x, y_i) - \hat{V}^π(x) = r_i - μ$
+  - $$
+    \hat{A}^π(x, y_i) = \hat{Q}^π(x, y_i) - \hat{V}^π(x) = r_i - μ
+    $$
 
 观察GRPO公式中的优势： $A(x, y_i) = \frac{ r_i - μ}{σ}$  ，可以发现就是蒙特卡洛的 $\hat{A}^π(x, y_i)= r_i - μ$ 
   - 唯一的差别是分母 σ，这是为了控制方差范围做的scale（蒙特卡洛本来就有方差大的缺点），属于trick，不影响本质
@@ -368,7 +368,9 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s
 - $τ \sim π_θ(s_1)$：给定初始状态 $s_1$，通过策略 $π_θ(τ|s_1)$ 采样出完整轨迹 $τ$
   > 对应到LLM：给定 prompt $x$，用LLM 生成response $y$  
   > 这里将每个token视为一个动作  
-  > $π_θ(τ|s_1)=π_θ(y|x)=π_θ(y_1|x)π_θ(y_2|x,y_1)π_θ(y_3|x,y_{1:2})...$  
+  > $$
+  > π_θ(τ|s_1)=π_θ(y|x)=π_θ(y_1|x)π_θ(y_2|x,y_1)π_θ(y_3|x,y_{1:2})...
+  > $$
   > 其中 $y_i$是 $y$ 的第 i 个token, $π_θ$ 是LLM，θ是模型权重
 - $G(τ)$ ：轨迹 $τ$ 的收益（gain），$G(τ)=r_1 + γ r_2 + γ^2 r_3 + ...$，$r_i$ 为第i步动作的reward
   > 对应到LLM：
@@ -376,7 +378,9 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s
   > 每个token没有中间reward，只有最终结果reward，则 $G(τ)=0 + 0 + ... + r_{\text{final}=}r_{\text{final}}$
 - $\mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)]$：对采样出的所有 $s_1$ 和 $τ$ 取平均
   > 对应到LLM：  
-  > $\mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)]=E_{x \sim D(x), y \sim π_θ(y|x)}[r_{\text{final}}]$  
+  > $$
+  > \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)]=E_{x \sim D(x), y \sim π_θ(y|x)}[r_{\text{final}}]
+  > $$
   > - 采样出 M 个prompt $x^1,...,x^{M}$  
   > - 每个prompt 采样 N 个 response: $y^{1,1} ..., y^{1,N}, ..., y^{M,N}$  
   > - 一共M\*N条轨迹τ：$(x^1, y^{1,1}), ..., (x^1, y^{1,N}), ..., (x^M, y^{M,N})$  
@@ -426,10 +430,14 @@ J(θ)
 
 > ### 策略梯度定理的两种写法
 > 很多教程中，策略梯度定理的写法更加简洁：   
-> $\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[G(τ) \nabla_θ \log π_θ(τ|s_1) \right]$  
+> $$
+> \nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[G(τ) \nabla_θ \log π_θ(τ|s_1) \right]
+> $$
 >   
 > 但本文的写法更贴近本质，且和现实RL框架的代码吻合：  
-> $\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right]$
+> $$
+> \nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right]
+> $$
 
 
 # 公式推导
@@ -465,10 +473,16 @@ J(θ)
 
 绝大多数机器学习问题，都是参数θ在打分函数 $f(x)$ 上，分布 $p(x)$ 不含参数  
 - 这种目标函数可以直接求导：  
-- $\nabla_θ J_θ = \nabla_θ \mathbb{E}_{x \sim p(x)} [f_θ(x)] = \mathbb{E}_{x \sim p(x)} [ \nabla_θ f_θ(x)]$
+- $$
+  \nabla_θ J_θ = \nabla_θ \mathbb{E}_{x \sim p(x)} [f_θ(x)] = \mathbb{E}_{x \sim p(x)} [ \nabla_θ f_θ(x)]
+  $$
 > 例：LLM的SFT（极大化gold response的概率）  
-> $J_θ = \mathbb{E}_{x \sim p(x)} [f_θ(x)] = \mathbb{E}_{(x,y) \sim D(x,y)} [π_θ(y|x)]$  
-> $\nabla_θ J_θ = \mathbb{E}_{(x,y) \sim D(x,y)} [ \nabla_θ π_θ(y|x)]$
+> $$
+> J_θ = \mathbb{E}_{x \sim p(x)} [f_θ(x)] = \mathbb{E}_{(x,y) \sim D(x,y)} [π_θ(y|x)]
+> $$
+> $$
+> \nabla_θ J_θ = \mathbb{E}_{(x,y) \sim D(x,y)} [ \nabla_θ π_θ(y|x)]
+> $$
 > - 样本 $x → (x,y)$： 数据集中提供的prompt $x$ 和response $y$
 > - 分布 $p(x) → D(x,y)$：数据分布，相当于包含配对 prompt-response 的完整数据集
 > - 打分函数 $f_θ(x) → π_θ(y|x)$：给定prompt x，生成指定response y 的概率
@@ -476,7 +490,9 @@ J(θ)
 然而有少数机器学习问题，参数θ在分布 $p(x)$ 上，打分函数 $f(x)$ 反而不含参数。 
 
 > 例：LLM的GRPO（极大化rollout response的收益）  
-> $J(θ) =  \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)}[G(x,y)]$  
+> $$
+> J(θ) =  \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)}[G(x,y)]
+> $$
 > - 样本 $x → (x,y)$： prompt $x$ + response $y$
 > - 分布 $p_θ(x) → p_θ(x,y)=D(x) \cdot π_θ(y|x)$：从数据集采样 prompt $x$ ，从LLM采样 response $y$
 > - 打分函数 $f(x) → G(x,y)$：利用规则计算reward（以及相应的gain），不含参数
@@ -497,7 +513,9 @@ J(θ)
 - 带参数采样问题：给定输入x，输出y是随机的（例如RL中给定初始状态，随机采样一个动作）
 
 带参数采样的目标函数不能直接求导：
-- $\nabla_θ J_θ = \nabla_θ \mathbb{E}_{x \sim p_θ(x)} [f(x)] ≠ \mathbb{E}_{x \sim p_θ(x)} [ \nabla_θ f(x)]$
+- $$
+  \nabla_θ J_θ = \nabla_θ \mathbb{E}_{x \sim p_θ(x)} [f(x)] ≠ \mathbb{E}_{x \sim p_θ(x)} [ \nabla_θ f(x)]
+  $$
 - 因为 $f(x)$ 不含 θ， $\nabla_θ f(x) = 0$
 
 正确的求导结果：
@@ -525,11 +543,15 @@ J(θ)
 
 对于目标函数 $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)]$  
 如果我们能找到另一组无参数分布 $q(x)$ 和含参数的打分函数 $g_θ(x)$ ，使得：  
-- $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$  
+- $$
+  J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]
+  $$
 - 分布 $p_θ(x)$ 和 打分函数 $g_θ(x)$ 使用同一组参数θ
 
 这样就把参数θ从分布转移到打分函数上了，从而能对 $J_θ$ 直接求导：  
-$\nabla_θ J_θ = \mathbb{E}_{x \sim q(x)} [ \nabla_θ g_θ(x)]$  
+$$
+\nabla_θ J_θ = \mathbb{E}_{x \sim q(x)} [ \nabla_θ g_θ(x)]
+$$
 
 > **“广义的”重参数化**这个名字是我编的，没见过类似写法，但直觉上是对的  
 > 标准的重参数化方法不长这样，但和本文推导无关，这里就不介绍了  
@@ -559,15 +581,22 @@ $\nabla_θ J_θ = \mathbb{E}_{x \sim q(x)} [ \nabla_θ g_θ(x)]$
 ### 整合 & 公式推导
 
 首先依据重参数化，我们要找到另一组无参数分布 $q(x)$ 和含参数的打分函数 $g_θ(x)$ ，使得：  
-- $J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$  
+- $$
+  J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]
+  $$
 - 分布 $p_θ(x)$ 和 打分函数 $g_θ(x)$ 使用同一组参数θ
 
 这样的 $q(x)$ 和 $g_θ(x)$ 可以借助重要性采样来构造：
 - $q(x) = p_θ(x)_{.detach}$，其中detach后就相当于不含参数了
-- $g_θ(x) = \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x)$
+- $$
+  g_θ(x) = \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x)
+  $$
 
 $q(x)$ 和 $g_θ(x)$ 显然满足条件：  
-$$J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim p_θ(x)_{.detach}} \left[ \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x) \right] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]$$
+
+$$
+J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)] = \mathbb{E}_{x \sim p_θ(x)_{.detach}} \left[ \frac{p_θ(x)}{p_θ(x)_{.detach}} f(x) \right] = \mathbb{E}_{x \sim q(x)} [g_θ(x)]
+$$
 
 这样就成功把参数θ从分布转移到了打分函数上，可以正常求导了。
 
@@ -672,18 +701,33 @@ J(θ)
 ## 目标函数的变体：动作优势之和
 
 如果把RL的目标函数从轨迹τ的收益 $G(τ)$ 改成动作优势之和:
-$$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \right]$$
+
+$$
+J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \right]
+$$
 
 当折扣因子γ=1，即无衰减时：
-$$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|}A(s_t, a_t) \right]$$
+
+$$
+J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|}A(s_t, a_t) \right]
+$$
 
 
 其导数恰好和对 $\mathbb{E}_{τ} [G(τ)]$ 求导的结果相同：
-$$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]$$
+
+$$
+\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
+$$
 
 > 以上是简化形式，完整形式是：
-> $$J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \right]$$
-> $$\nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \nabla_θ \log π_θ(a_t|s_t) \right]$$
+>
+> $$
+> J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} γ^{t-1} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \right]
+> $$
+>
+> $$
+> \nabla_θ J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \frac{π_θ(a_t|s_t)}{π_θ(a_t|s_t)_{.detach}} \nabla_θ \log π_θ(a_t|s_t) \right]
+> $$
 > 如果忽略训练、推理的差异，即认为在数值上 $π_θ(a_t|s_t)=π_θ(a_t|s_t)_{.detach}$ ，得到的就是简化形式
 
 **这实际就是最简单版本的GRPO公式。**
@@ -721,8 +765,11 @@ J(θ)
 &≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \right]
 \end{aligned}
 ```
-其中单个token $y_{i,t}$ 的优势： 
-$$A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关$$
+其中单个token $y_{i,t}$ 的优势：
+
+$$
+A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关
+$$
 
 - 求导
 ```math
@@ -759,7 +806,9 @@ on-policy版本的GRPO，目标函数是0吗？
 
 PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：
 
-$A_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})$
+$$
+A_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})
+$$
 - $r$ 是最终response
 - $V_θ(s_t = x+y_{<t})$ 是一个估计状态 $s_t = x+y_{<t}$ 的神经网络。
  
@@ -787,8 +836,11 @@ J(θ)
 &≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[  A_{y_{i}} \cdot \frac{π_θ(y_{i}|x)}{π_θ(y_{i}|x)_{.detach}} \right]
 \end{aligned}
 ```
-其中完整response $y_{i}$ 的优势： 
-$$A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}$$
+其中完整response $y_{i}$ 的优势：
+
+$$
+A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}
+$$
 
 它去掉了GRPO中每个token优势相等的假设。
 
@@ -802,7 +854,9 @@ $$A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\le
 
 基于重要性采样的公式： $\mathbb{E}_{x \sim p(x)} [f(x)] = \mathbb{E}_{x \sim q(x)} \left[ \frac{p(x)}{q(x)} f(x) \right]$ ，我们可以从任意一个分布中rollout数据，来训练GRPO：
 
-$$\mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)} [G(y)] = \mathbb{E}_{x \sim D(x), y \sim q(y|x)} \left[ \frac{π_θ(y|x)}{q(y|x)} G(y) \right]$$
+$$
+\mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)} [G(y)] = \mathbb{E}_{x \sim D(x), y \sim q(y|x)} \left[ \frac{π_θ(y|x)}{q(y|x)} G(y) \right]
+$$
 
 - $π_θ(y|x)$ 是待训练的LLM
 - $q(y|x)$ 是用来rollout的数据分布（通常也是个LLM）
