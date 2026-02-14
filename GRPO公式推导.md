@@ -706,9 +706,7 @@ $$
 - on-policy，即rollout出一批数据只用来更新一次梯度，用后即丢弃（因此没有旧策略 $π_{old}$ ）
 - 训练、推断的LLM用两个不同框架部署
 
-## 公式
-
-- 符号约定：
+## 符号约定：
   - 从数据集 $D(x)$ 采样 N 个prompt $x$  （为了简化公式，不引入角标）
   - 为每个 $x$ rollout G 个response $\{y_i\}_{i=1}^G$
   - $\{y_i\}_{i=1}^G$ 对应的reward为 $\{r_i\}_{i=1}^G$
@@ -718,7 +716,7 @@ $$
   - $π_θ$ 是训练框架（例如fsqp）部署的LLM，$π_{θ.detach}$ 是训练框架（例如vllm）部署的LLM
   - 所有response $y_i$ 是从 $π_{θ.detach}$ rollout出来的
 
-- 目标函数：
+## 目标函数：
 
 ```math
 \begin{aligned}
@@ -733,7 +731,8 @@ $$
 A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关
 $$
 
-- 求导
+## 求导
+
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
@@ -766,11 +765,12 @@ on-policy版本的GRPO，目标函数是0吗？
 
 ## PPO：用网络估计优势A
 
-PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：
+PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：  
 
 $$
 A_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})
 $$
+
 - $r$ 是最终response
 - $V_θ(s_t = x+y_{<t})$ 是一个估计状态 $s_t = x+y_{<t}$ 的神经网络。
  
@@ -853,7 +853,7 @@ response空间无限的例子不容易理解，这里举一个有限的例子
 
 ## off-policy: 用模型的历史版本 $π_{old}$ rollout
 
-GRPO公式中，更常见的是off-policy形式：
+GRPO公式中，更常见的是off-policy形式：  
 
 
 ```math
@@ -891,8 +891,8 @@ off-policy相比于on-policy是一种trade-off，能提升训练效率，代价�
 
 情况举例：
 - vllm一次选择 `train_batch_size` 个prompt，每个rollout出 `n` 个response，一共 `train_batch_size × n` 个response 
-- fsdp一次选择 `ppo_mini_batch_size` 个prompt（相应`ppo_mini_batch_size × n`个response）用于更新模型，一共更新 $\frac{\text{train\_batch\_size}}{\text{ppo\_mini\_batch\_size}}$ 轮
-- 如果未设置`use_dynamic_bsz`，则gpu实际使用`ppo_micro_batch_size_per_gpu`个prompt，并且累加到`ppo_mini_batch_size`完成一次梯度更新，一共累加 $\frac{\text{ppo\_mini\_batch\_size}}{\text{ppo\_micro\_batch\_size\_per\_gpu}}$ 轮
+- fsdp一次选择 `ppo_mini_batch_size` 个prompt（相应`ppo_mini_batch_size × n`个response）用于更新模型，一共更新 `train_batch_size / ppo_mini_batch_size` 轮
+- 如果未设置`use_dynamic_bsz`，则gpu实际使用`ppo_micro_batch_size_per_gpu`个prompt，并且累加到`ppo_mini_batch_size`完成一次梯度更新，一共累加 `ppo_mini_batch_size / ppo_micro_batch_size_per_gpu` 轮
 
 ## LLM知识蒸馏：用另一个更强大的LLM rollout
 
