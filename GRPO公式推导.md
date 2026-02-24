@@ -397,8 +397,8 @@ RL的目标函数为： $J(θ) = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s
 \begin{aligned}
 J(θ) 
 &= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \right] \qquad 理论结果 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}\right] \qquad 实际计算图 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ)]  \qquad 数值结果
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ)]  \qquad 数值结果
 \end{aligned}
 ```
 
@@ -407,8 +407,8 @@ J(θ)
 \begin{aligned}
 \nabla_θ J(θ) 
 &= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right] \qquad 理论结果 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1)\right] \qquad 实际计算图 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \qquad 数值结果
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1)\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \qquad 数值结果
 \end{aligned}
 ```
 
@@ -447,7 +447,7 @@ J(θ)
 \begin{aligned}
 J(θ) 
 & = \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)}[G(τ)] \\
-& ≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ)]
+& ≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ)]
 \end{aligned}
 ```
 - 发现：展开后的表达式完全不含参数θ，因此无法对θ求导
@@ -599,8 +599,8 @@ $$
 \begin{aligned}
 J(θ) 
 &= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \right] \qquad 理论结果 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}\right] \qquad 实际计算图 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ)]  \qquad 数值结果
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}}\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ)]  \qquad 数值结果
 \end{aligned}
 ```
 
@@ -608,8 +608,8 @@ J(θ)
 \begin{aligned}
 \nabla_θ J(θ) 
 &= \mathbb{E}_{s_1 \sim D(s_1), τ \sim π_θ(τ|s_1)_{.detach}}\left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1) \right] \qquad 理论结果 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1)\right] \qquad 实际计算图 \\
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \qquad 数值结果
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[G(τ) \frac{π_θ(τ|s_1)}{π_θ(τ|s_1)_{.detach}} \nabla_θ \log π_θ(τ|s_1)\right] \qquad 实际计算图 \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \qquad 数值结果
 \end{aligned}
 ```
 
@@ -635,8 +635,8 @@ J(θ)
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \\
-&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right] \\
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} [G(τ) \cdot \nabla_θ \log π_θ(τ|s_1)]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right] \\
 &≈ \mathbb{E}_{s_0 \sim D(s_0), τ \sim π_θ(τ|s_0)} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
 \end{aligned}
 ```
@@ -655,10 +655,10 @@ J(θ)
 ```math
 \begin{aligned}
 \nabla_θ J(θ)
-&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
-&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G_t(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
-&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} Q(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
-&= \frac{1}{M} \frac{1}{N} \sum_{采样M个初始状态s_1} \sum_{每个s_1采样N个轨迹τ} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
+&≈ \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[ \sum_{t=1}^{|τ|} G_t(τ) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[ \sum_{t=1}^{|τ|} Q(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]  \\
+&= \frac{1}{M} \frac{1}{N} \sum_{采样M个 \atop 初始状态s_1} \sum_{每个s_1采样 \atop N个轨迹τ} \left[ \sum_{t=1}^{|τ|} A(s_t, a_t) \cdot \nabla_θ \log π_θ(a_t|s_t) \right]
 \end{aligned}
 ```
 
@@ -754,21 +754,21 @@ $$
 ```
 
 ## 讨论
-以上是GRPO公式**最本质**的部分。完整的GRPO只是加上了一些trick：
-- $π_{old}$ ：为了把on-policy变成off-policy以节约rollout成本，需要使用重要性采样
-- clip操作：off-policy情况下为了防止 $π_{old}$ 和 $π_θ$ 差距过大，导致训练不稳定
-- KL散度：为了防止RL训练后的 $π_θ$ 和其最初始值 $π_{ref}$ 偏离太远，导致灾难性遗忘
+- 以上是GRPO公式**最本质**的部分。完整的GRPO只是加上了一些trick：
+  - $π_{old}$ ：为了把on-policy变成off-policy以节约rollout成本，需要使用重要性采样
+  - clip操作：off-policy情况下为了防止 $π_{old}$ 和 $π_θ$ 差距过大，导致训练不稳定
+  - KL散度：为了防止RL训练后的 $π_θ$ 和其最初始值 $π_{ref}$ 偏离太远，导致灾难性遗忘
 
-$\frac{1}{|y_i|}$ 在公式中的位置？
-- GRPO公式的常见写法中，$\frac{1}{|y_i|}$ 不出现在优势 $A$ 里，而出现在 $\frac{1}{|y_i|} \sum_{i=1}^{|y_i|}$ 位置
-- 两种写法是等价的，我的写法更本质： $\frac{1}{|y_i|}$ 来自于严格推导出的单个token的优势
+- $\frac{1}{|y_i|}$ 在公式中的位置？
+  - GRPO公式的常见写法中，$\frac{1}{|y_i|}$ 不出现在优势 $A$ 里，而出现在 $\frac{1}{|y_i|} \sum_{i=1}^{|y_i|}$ 位置
+  - 两种写法是等价的，我的写法更本质： $\frac{1}{|y_i|}$ 来自于严格推导出的单个token的优势
 
-公式中 $\frac{π_θ}{π_{θ.detach}}$ 为什么不移除？
-- 其反映了RL实质的训练过程：从 $π_{θ.detach}$ rollout，从 $π_θ$ 更新参数，两者采用不同的部署框架（而且数值经常有差异，训练-推理不一致是RL中一个头疼的问题）
-- 即使二者数值相等也不能移除，它们在计算图上有实际对应，移除后无法对 $π_θ$ 求导
+- 公式中 $\frac{π_θ}{π_{θ.detach}}$ 为什么不移除？
+  - 其反映了RL实质的训练过程：从 $π_{θ.detach}$ rollout，从 $π_θ$ 更新参数，两者采用不同的部署框架（而且数值经常有差异，训练-推理不一致是RL中一个头疼的问题）
+  - 即使二者数值相等也不能移除，它们在计算图上有实际对应，移除后无法对 $π_θ$ 求导
 
-on-policy版本的GRPO，目标函数是0吗？
-- 因为 $A$ 是通过reward归一化得到的。如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)$ 确实等于0。但梯度 $J(θ)≠0$ 。后面章节会详细介绍为什么梯度不是0。
+- on-policy版本的GRPO，目标函数是0吗？
+  - $J(θ)$ 确实等于0。但梯度 $J(θ)≠0$ 。 因为 $A$ 是通过reward归一化得到的。如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)=0$ 。后面章节会详细介绍为什么梯度不是0。
 
 
 # 拓展：PPO和GSPO
@@ -949,3 +949,67 @@ q(y|x) =
 ```
 
 可以发现该结果就是SFT监督学习的公式。
+
+
+# min-clip操作
+
+完整的GRPO公式通常还有min-clip操作，这是一种训练技巧。
+
+## 目标函数
+
+```math
+\begin{aligned}
+J(θ) 
+&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right]
+\end{aligned}
+```
+
+其中 $\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right) = \text{min} \left( A \cdot \frac{π_θ}{π_{old}} , A \cdot \text{clip} \left(\frac{π_θ}{π_{old}}, 1-ε, 1+ε \right) \right)$
+
+> 注意：
+> - $\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right)$ 中要把 $A$ 和 $\frac{π_θ}{π_{old}}$ 看成两个自变量，而不是把 $A \cdot \frac{π_θ}{π_{old}}$ 整体看成一个自变量，即把其中的乘号 $\cdot$ 也视为 $\text{min-clip}$ 的一部分。严格来说写成 $\text{min-clip} \left( A , \frac{π_θ}{π_{old}} \right)$ 更合适，但不直观
+> - 相比于最简版本GRPO，这里用 $\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right)$ 代替了 $A \cdot \frac{π_θ}{π_{old}}$
+
+## 求导
+
+min-clip的意义直接从目标函数上比较难看，从导数的角度更容易理解：
+
+```math
+\begin{aligned}
+\nabla_θ J(θ) 
+&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} \nabla_θ \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} \nabla_θ \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right]
+\end{aligned}
+```
+
+其中
+```math
+\nabla_θ \text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right) =
+\begin{cases}
+0 \qquad & \quad 触发\text{clip}：A>0, \frac{π_θ}{π_{old}} > 1+ε \ 或者 \ A<0, \frac{π_θ}{π_{old}} < 1-ε \\
+A \cdot \frac{π_θ}{π_{old}} \nabla_θ \log π_θ \qquad & 不触发\text{clip}：otherwise
+\end{cases}
+```
+
+min-clip起到的作用
+- 从求导公式本身来理解：
+  - 当触发clip时，梯度会被**置为0**，而不是设置一个梯度的上/下限
+  - 当不触发clip时，和标准的 $A \cdot \frac{π_θ}{π_{old}}$ 求导结果一致
+- 该操作的实际含义：
+  - **对于概率过大的好动作，或者概率过小的坏动作，不更新模型**
+  - 强化学习的角度：强化学习的目的，本质是增大好动作概率、减小坏动作概率。如果好动作本身已经概率很大（或坏动作本身已经概率很小），继续更新可能导致和预训练好的LLM相差过大，导致灾难性遗忘（和KL散度作用相似，只不过KL散度是软约束，min-clip是硬约束）
+  - 数值计算的角度：重要性采样在期望的角度是成立的，但在采样求均值的角度，如果 $\frac{π_θ}{π_{old}}$ 差距过大会导致严重方差，估计不准。（这是次要因素，仅能解释clip而不能解释min）
+
+注意事项：
+- min-clip是“不对称”的：触发clip的条件是 $A>0, \frac{π_θ}{π_{old}} > 1+ε \ 或者 \ A<0, \frac{π_θ}{π_{old}} < 1-ε$ ，即对于好动作只触发上clip，对坏动作只触发下clip。而不是对于任何动作都clip到 $1-ε < \frac{π_θ}{π_{old}} < 1+ε$ 的范围。
+- 概率大/小指的不是 $π_θ$ 的绝对大小，而是 $\frac{π_θ}{π_{old}}$ 的相对大小
+- 对于on-policy， $\frac{π_θ}{π_{old}}=1$ ,等价于没有min-clip。
+
+从表格会更好理解这种不对称性：
+|                                     | A>0 好动作            | A<0 坏动作           |
+|:-----------------------------------:| :-------------------: | :-----------------: |
+| $\frac{π_θ}{π_{old}} > 1+ε$ 概率过大 | 不继续增大（**丢弃**） | 应当减小（更新）      |
+| $\frac{π_θ}{π_{old}} > 1$ 概率增大   | 应当增大（更新）       | 应当减小（更新）      |
+| $\frac{π_θ}{π_{old}} < 1$ 概率减小   | 应当增大（更新）       | 应当减小（更新）      |
+| $\frac{π_θ}{π_{old}} < 1-ε$ 概率过小 | 应当增大（更新）       | 不继续减小（**丢弃**）|
