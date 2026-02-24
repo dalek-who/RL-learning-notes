@@ -733,14 +733,14 @@ $$
 ```math
 \begin{aligned}
 J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_θ(y_t|x, y_{<t})_{.detach}} \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \right]
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_θ(y_i|x)_{.detach}} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \right]
 \end{aligned}
 ```
-其中单个token $y_{i,t}$ 的优势：
+其中单个token $y_{i,t}$ 的优势为 $A_{y_{i,t}}$ ，完整response的优势为 $A_{y_{i}}$ ，则：
 
 $$
-A_{y_{i,t}} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关
+A_{y_{i,t}} = \frac{1}{|y_i|} \cdot A_{y_i} , \qquad A_{y_i} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} , \qquad 都与t无关
 $$
 
 ## 求导
@@ -748,8 +748,8 @@ $$
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_θ(y_t|x, y_{<t})_{.detach}} \nabla_θ \log π_θ(y_t|x, y_{<t})  \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_t|x, y_{<t}) \right]
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_θ(y_i|x)_{.detach}} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_{i,t}|x, y_{i,<t})  \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_θ(y_{i,t}|x, y_{i,<t})_{.detach}} \nabla_θ \log π_θ(y_{i,t}|x, y_{i,<t}) \right]
 \end{aligned}
 ```
 
@@ -760,7 +760,7 @@ $$
   - KL散度：为了防止RL训练后的 $π_θ$ 和其最初始值 $π_{ref}$ 偏离太远，导致灾难性遗忘
 
 - $\frac{1}{|y_i|}$ 在公式中的位置？
-  - GRPO公式的常见写法中，$\frac{1}{|y_i|}$ 不出现在优势 $A$ 里，而出现在 $\frac{1}{|y_i|} \sum_{i=1}^{|y_i|}$ 位置
+  - GRPO公式的常见写法中，$\frac{1}{|y_i|}$ 不写在优势 $A$ 里，而写在 $\frac{1}{|y_i|} \sum_{i=1}^{|y_i|}$ 位置
   - 两种写法是等价的，我的写法更本质： $\frac{1}{|y_i|}$ 来自于严格推导出的单个token的优势
 
 - 公式中 $\frac{π_θ}{π_{θ.detach}}$ 为什么不移除？
@@ -770,57 +770,6 @@ $$
 - on-policy版本的GRPO，目标函数是0吗？
   - $J(θ)$ 确实等于0。但梯度 $J(θ)≠0$ 。 因为 $A$ 是通过reward归一化得到的。如果不考虑 $π_{θ.detach}$ 和 $π_θ$ 的数值差异，$J(θ)=0$ 。后面章节会详细介绍为什么梯度不是0。
 
-
-# 拓展：PPO和GSPO
-
-有了以上GRPO最本质的公式，可以很容易拓展出PPO和GSPO的公式
-
-## PPO：用网络估计优势A
-
-PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：  
-
-$$
-A_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})
-$$
-
-- $r$ 是最终response
-- $V_θ(s_t = x+y_{<t})$ 是一个估计状态 $s_t = x+y_{<t}$ 的神经网络。
- 
-价值网络 $V_θ(x+y_{<t})$ 的形式，与LLM计算句子概率是类似的： $π_θ(x+y_{<t})$ ，因此在实现上可以和 $π_θ(x+y_{<t})$ 共用相同的LLM，只是在输出时换用不同的head。
-
-> 以上只是PPO最核心的思想。更多细节就不展开了（例如V如何训练、用广义优势估计GAE计算A）
-
-PPO与GRPO比较：
-- GRPO的A直接统计得到，本质是蒙特卡洛；PPO的A用网络估计，本质是时序差分（时序差分是RL中另一大类方法，这里不做探讨）
-- PPO和GRPO的训练效果：PPO低方差、高偏差；GRPO高方差、低偏差
-  - 如何理解？
-  - PPO低方差：用神经网络估计A，本质是用大量数据的滑动平均，波动比GRPO每次采样小
-  - PPO高偏差：（1）网络不一定有能力拟合真实的A；（2）训练过程中，网络可能还未收敛
-
-## GSPO：把整个response作为一个大动作
-
-如果把整个response $y_i$ 视为一个完整动作，得到的就是GSPO。
-
-目标函数：
-
-```math
-\begin{aligned}
-J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)_{.detach}} \left[ A_{y} \cdot \frac{π_θ(y|x)}{π_θ(y|x)_{.detach}} \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[  A_{y_{i}} \cdot \frac{π_θ(y_{i}|x)}{π_θ(y_{i}|x)_{.detach}} \right]
-\end{aligned}
-```
-其中完整response $y_{i}$ 的优势：
-
-$$
-A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}
-$$
-
-它去掉了GRPO中每个token优势相等的假设。
-
-> 注：
-> - on-policy下GSPO和GRPO是完全等价的，因为 $\frac{π_θ}{π_{θ.detach}}$ 都是1.   
-> - off-policy下把 $π_{θ.detach}$ 换成 $π_{old}$ ，两者就不相等了。
 
 # 重要性采样
 
@@ -871,8 +820,8 @@ GRPO公式中，更常见的是off-policy形式：
 ```math
 \begin{aligned}
 J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right]
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_{old}(y_i|x)} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right]
 \end{aligned}
 ```
 
@@ -960,12 +909,23 @@ q(y|x) =
 ```math
 \begin{aligned}
 J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right]
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_{old}(y_i|x)} \left[ \sum_{t=1}^{|y_i|} \text{min-clip} \left( A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y_i|} \text{min-clip} \left( A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right]
 \end{aligned}
 ```
 
-其中 $\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right) = \text{min} \left( A \cdot \frac{π_θ}{π_{old}} , A \cdot \text{clip} \left(\frac{π_θ}{π_{old}}, 1-ε, 1+ε \right) \right)$
+单个token $y_{i,t}$ 的优势：
+
+$$
+A_{y_{i,t}} = \frac{1}{|y_i|} \cdot A_{y_i} = \frac{1}{|y_i|} \cdot \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)} \qquad 与t无关
+$$
+
+
+其中的min-clip算子：
+
+$$
+\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right) = \text{min} \left( A \cdot \frac{π_θ}{π_{old}} , A \cdot \text{clip} \left(\frac{π_θ}{π_{old}}, 1-ε, 1+ε \right) \right)
+$$
 
 > 注意：
 > - $\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right)$ 中要把 $A$ 和 $\frac{π_θ}{π_{old}}$ 看成两个自变量，而不是把 $A \cdot \frac{π_θ}{π_{old}}$ 整体看成一个自变量，即把其中的乘号 $\cdot$ 也视为 $\text{min-clip}$ 的一部分。严格来说写成 $\text{min-clip} \left( A , \frac{π_θ}{π_{old}} \right)$ 更合适，但不直观
@@ -978,8 +938,8 @@ min-clip的意义直接从目标函数上比较难看，从导数的角度更容
 ```math
 \begin{aligned}
 \nabla_θ J(θ) 
-&= \mathbb{E}_{x \sim D(x), y \sim π_{old}(y|x)} \left[ \sum_{t=1}^{|y|} \nabla_θ \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right] \\
-&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y|} \nabla_θ \text{min-clip} \left( A_{y_t} \cdot \frac{π_θ(y_t|x, y_{<t})}{π_{old}(y_t|x, y_{<t})} \right) \right]
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_{old}(y_i|x)} \left[ \sum_{t=1}^{|y_i|} \nabla_θ \text{min-clip} \left( A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \sum_{t=1}^{|y_i|} \nabla_θ \text{min-clip} \left( A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right]
 \end{aligned}
 ```
 
@@ -1013,3 +973,167 @@ min-clip起到的作用
 | $\frac{π_θ}{π_{old}} > 1$ 概率增大   | 应当增大（更新）       | 应当减小（更新）      |
 | $\frac{π_θ}{π_{old}} < 1$ 概率减小   | 应当增大（更新）       | 应当减小（更新）      |
 | $\frac{π_θ}{π_{old}} < 1-ε$ 概率过小 | 应当增大（更新）       | 不继续减小（**丢弃**）|
+
+
+# 拓展：PPO、GSPO、DAPO
+
+有了以上GRPO的公式，可以很容易拓展出PPO、GSPO、DAPO等各种变体公式
+
+## PPO：用网络估计优势A
+
+PPO中，第t个token的优势 $A_t$ 不是通过数据归一化得到的，而是用神经网络计算的：  
+
+$$
+A_t = Q_t - V_t = γ^{|y|-t} \cdot r - V_θ(s_t = x+y_{<t})
+$$
+
+- $r$ 是最终response
+- $V_θ(s_t = x+y_{<t})$ 是一个估计状态 $s_t = x+y_{<t}$ 的神经网络。
+ 
+价值网络 $V_θ(x+y_{<t})$ 的形式，与LLM计算句子概率是类似的： $π_θ(x+y_{<t})$ ，因此在实现上可以和 $π_θ(x+y_{<t})$ 共用相同的LLM，只是在输出时换用不同的head。
+
+> 以上只是PPO最核心的思想。更多细节就不展开了（例如V如何训练、用广义优势估计GAE计算A）
+
+PPO与GRPO比较：
+- GRPO的A直接统计得到，本质是蒙特卡洛；PPO的A用网络估计，本质是时序差分（时序差分是RL中另一大类方法，这里不做探讨）
+- PPO和GRPO的训练效果：PPO低方差、高偏差；GRPO高方差、低偏差
+  - 如何理解？
+  - PPO低方差：用神经网络估计A，本质是用大量数据的滑动平均，波动比GRPO每次采样小
+  - PPO高偏差：（1）网络不一定有能力拟合真实的A；（2）训练过程中，网络可能还未收敛
+
+## GSPO：把整个response作为一个大动作
+
+如果把整个response $y_i$ 视为一个完整动作，得到的就是GSPO。
+
+目标函数：
+
+```math
+\begin{aligned}
+J_{GSPO}(θ) 
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_{old}(y_i|x)} \left[ \text{min-clip}\left( A_{y_i} \cdot \frac{π_θ(y_i|x)}{π_{old}(y_i|x)} \right) \right] \\
+&≈ \frac{1}{N} \sum_{采样 \atop N个x} \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} \left[ \text{min-clip}\left( A_{y_i} \cdot \frac{π_θ(y_i|x)}{π_{old}(y_i|x)} \right) \right]
+\end{aligned}
+```
+其中完整response $y_{i}$ 的优势：
+
+$$
+A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}
+$$
+
+它去掉了GRPO中每个token优势相等的假设。
+
+> 注：
+> - on-policy下GSPO和GRPO是完全等价的，因为 $\frac{π_θ}{π_{θ.detach}}$ 都是1.   
+> - off-policy下把 $π_{θ.detach}$ 换成 $π_{old}$ ，两者就不相等了。
+
+## DAPO：按token数加权 + clip-higher + 长度软惩罚 + 动态采样
+
+记 $B_i = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)$ ，$B_i$ 的值依赖于response $y_i$ 。则GRPO的目标函数可改写成：
+
+```math
+\begin{aligned}
+J_{GRPO}(θ) 
+&= \mathbb{E}_{x \sim D(x), y_i \sim π_{old}(y_i|x)} \left[ B_i  \right] \\
+&= \mathbb{E}_{x \sim D(x)} \left[ \mathbb{E}_{y_i \sim π_{old}(y_i|x)} \left[ B_i \right] \right] \\
+&≈ \mathbb{E}_{x \sim D(x)} \left[ \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} B_i \right] \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i \right]
+\end{aligned}
+```
+
+### 修改1：按token数加权
+
+上述GRPO公式中，可以认为 $B_i$ 是个依附于序列 $y_i$ 的随机变量，每个 $y_i$ 权重均等，都是 $\frac{1}{G}$ 。而DAPO中把每个序列的权重改为 $\frac{|y_i|}{\sum_{1=i}^G |y_i|}$ ，即 $\frac{y_i 中的token数}{一组response的总token数}$ 。则DAPO的公式在**期望**上与GRPO相等（暂不考虑clip-higher等其他trick）：
+
+$$
+J_{DAPO}(θ) 
+= \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{|y_i|}{\sum_{1=i}^G |y_i|} \cdot B_i \right]
+= \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i \right]
+= J_{GRPO}(θ)
+$$
+
+这种相等只是在**期望**意义上相等，在一组具体的采样上，数值**并不相等**.
+
+> 原理：加权平均与简单平均相等的条件
+> 对于n个随机变量 $\{X_i\}_{i=1}^n$ 和相应权重 $w_i$ ，其中 $\sum_{i=1}^n w_i=1$
+> 如果想让简单平均和加权平均的期望相等，即 $\mathbb{E}\left[ \frac{1}{n} \sum_{i=1}^n X_i \right] = \mathbb{E}\left[ \sum_{i=1}^n w_i X_i \right]$ ，则需要满足的条件（二者满足其一即可）：
+> - 平凡情况：所有 $X_i$ 相等
+> - 非平凡情况：$w_i$ 和 $X_i$ 互相独立
+> 如果认为根据token数赋予的权重，与回答的概率、正确性无关，则上述 $J_{DAPO}(θ) = J_{GRPO}(θ)$ 成立。
+
+#### 为什么要按token数加权
+
+对DAPO的目标函数稍加变形：
+
+```math
+\begin{aligned}
+J_{DAPO}(θ) 
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{|y_i|}{\sum_{1=i}^G |y_i|} \cdot B_i \right] \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot \left( \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot B_i \right) \right] \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i' \right] \qquad 与GRPO形式相同
+\end{aligned}
+```
+
+
+其中 
+```math
+\begin{aligned}
+B_i' 
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{1}{ \text{mean} \{|y_i|\} } A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}}' \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)
+\end{aligned}
+```
+
+相当于把GRPO中单个token的优势从 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ 换成 $A_{y_{i,t}}' = \frac{1}{ \text{mean}\{|y_i|\}} A_{y_{i}}$
+
+为什么要做这种变换：
+- 原始GRPO中，如果序列 $y_i$ 过长，会稀释单个token的优势 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ ，即对长输出不友好（尤其带thinking的情况）
+- 把 $\frac{1}{|y_i|}$ 换成 $\frac{1}{\text{mean}\{|y_i|\}}$ ，单个token的优势就不受序列长度影响了。
+- 这种情况下，每个序列的优势A之和就不是0了。但这并不是错的，GAPO可以认为是用和GRPO不同的启发式方式定义token优势，累加后和GRPO的优势不同，相当于对GRPO优势的“校正”
+
+> 比较：GRPO、GSPO、DAPO
+> - GRPO：蒙特卡洛计算序列级优势 → 启发式token级优势（简单平均）
+> - DAPO（另一种token级）：GRPO的序列级优势 → 另一种启发式的token级优势（排除序列长度影响） → 累加得到校正后的序列级优势
+> - GSPO（序列级）：GRPO的序列级优势（不拆解为token级）
+> 
+> 背后隐含的假设：
+> - GRPO：序列中每个token优势相等，token优势受序列长度影响
+> - DAPO：序列中每个token优势相等，但每个token优势不受序列长度影响
+> - GSPO：不要引入启发式计算单个token优势
+
+
+### 修改2：clip-higher
+
+把min-clip算子中，clip的上限调高：
+
+$$
+\text{min-clip} \left( A \cdot \frac{π_θ}{π_{old}} \right) = \text{min} \left( A \cdot \frac{π_θ}{π_{old}} , A \cdot \text{clip} \left(\frac{π_θ}{π_{old}}, 1-ε_{low}, 1+ε_{high} \right) \right)
+$$
+
+其中通常 $ε_{low} = ε < ε_{high}$
+
+目的：
+- 原本GRPO的min-clip：更新时丢弃概率过大的好token、概率过小的坏token，以防止和旧策略相差过大
+- 实际训练中，“丢弃概率过大的好token”（即clip上限）更容易触发，但人们发现这种上限clip很多是“aha-moment”，（生成aha对于旧策略是低概率的，但在新策略的CoT中是高概率的，而且有利于引导出正确答案）。因此上限clip会抑制CoT训练。
+- 因此把clip的上限调高（即对概率大的好token更加宽容）
+
+### 修改3：长度软惩罚
+
+DAPO对回复长度的阈值惩罚比GRPO更缓和：
+
+```math
+reward_{len} (y_i) =
+\begin{cases}
+0 \qquad & |y_i|≤l_{low} \\
+-\frac{|y_i| - l_{low}}{l_{high} - l_{low}} \qquad & l_{low} < |y_i| < l_{high}\\
+-1 \qquad & |y_i| ≥ l_{high}
+\end{cases}
+```
+
+其中长度在 $l_{low} < |y_i| < l_{high}$ 设置一个线性的软惩罚。
+
+### 修改4：动态采样
+
+GRPO中，如果生成的一组回复全错（例如训练早期）或全对（训练晚期），这种情况下所有token优势都是0，没办法训练。因此DAPO会丢弃这种数据，只留下回复有对也有错的数据。
+
