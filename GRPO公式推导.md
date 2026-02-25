@@ -195,11 +195,9 @@ Q^π(s,a)
 
 ## 拓展内容：贝尔曼方程（V←V、Q←Q、V←Q、Q←V 的互相递归计算）
 
-推导蒙特卡洛、GRPO不需要贝尔曼方程，此处略。推导时序差分、PPO才需要。
+**推导蒙特卡洛、GRPO不需要贝尔曼方程**，推导时序差分、PPO才需要。故此节可以略过，列出来只是作为参考。
 
-<details>
-<summary><b>点击展开贝尔曼方程的内容</b></summary>
-  
+
 **概率环境**：
 ```math
 \begin{aligned}
@@ -1026,9 +1024,38 @@ $$
 > - on-policy下GSPO和GRPO是完全等价的，因为 $\frac{π_θ}{π_{θ.detach}}$ 都是1.   
 > - off-policy下把 $π_{θ.detach}$ 换成 $π_{old}$ ，两者就不相等了。
 
-## DAPO：按token数加权 + clip-higher + 长度软惩罚 + 动态采样
+## DAPO：token优势不受输出长度影响 + clip-higher + 长度软惩罚 + 动态采样
 
-记 $B_i = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)$ ，$B_i$ 的值依赖于response $y_i$ 。则GRPO的目标函数可改写成：
+
+### 修改1：token优势不受输出长度影响
+
+#### Motivation： GRPO对长输出不友好
+- 原始GRPO中，如果输出 $y_i$ 过长，会稀释单个token的优势 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ ，导致正确的长序列（尤其带CoT的情况）梯度更新幅度不够大
+- 解决方案：把 $\frac{1}{|y_i|}$ 换成 $\frac{1}{\text{mean}\{|y_i|\}}$ ，单个token的优势就不受序列长度影响了。
+
+#### 理解：对GRPO中优势的“修正”
+
+DAPO将token优势中的 $\frac{1}{|y_i|}$ 换成 $\frac{1}{\text{mean}\{|y_i|\}}$ ，可以认为是对原始GRPO中单个token优势、完整序列优势的修正：
+
+- 初始化：给定GRPO中完整response $y_i$ 优势 $A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}$
+- 重新定义单个token的优势： $A_{y_{i,t}}' = \frac{1}{ \text{mean}\{|y_i|\}} A_{y_{i}}$ （而在原始GRPO中是 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ ） 
+- 修正后完整response $y_i$ 优势： $A_{y_{i}}' = \frac{|y_i|}{ \text{mean}\{|y_i|\}} A_{y_{i}}$ 
+- 依然假设同一个回复中每个token优势相同，且折扣因子为1
+
+> todo：GRPO的结果可以直接用蒙特卡洛法解出来。但暂未找到哪种方法能直接解出DAPO的结果，因此这里只能用“修正”的方式来解释。不太严谨。
+
+#### 修正后的性质
+- 不改变优势的正负：好/坏动作依然是好/坏动作
+- 对长度超过平均值的序列，优势幅度被放大；长度低于平均值的序列，优势幅度被缩小
+- 修正后，同一个prompt的所有response优势之和（即所有token的优势之和）**期望**依然是0（但数值不一定不是0）
+
+#### 证明（不重要）：修正后token优势之和的期望依然是0
+
+- 在GRPO公式中：
+
+记 $B_i = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)$ 
+
+$B_i$ 的值依赖于response $y_i$ ，于是GRPO的目标函数可改写成：
 
 ```math
 \begin{aligned}
@@ -1040,67 +1067,95 @@ J_{GRPO}(θ)
 \end{aligned}
 ```
 
-### 修改1：按token数加权
+- 在DAPO公式中：
 
-上述GRPO公式中，可以认为 $B_i$ 是个依附于序列 $y_i$ 的随机变量，每个 $y_i$ 权重均等，都是 $\frac{1}{G}$ 。而DAPO中把每个序列的权重改为 $\frac{|y_i|}{\sum_{1=i}^G |y_i|}$ ，即 $\frac{y_i 中的token数}{一组response的总token数}$ 。则DAPO的公式在**期望**上与GRPO相等（暂不考虑clip-higher等其他trick）：
+仿照GRPO，记 $B_i' = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}}' \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)$ 
 
-$$
-J_{DAPO}(θ) 
-= \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{|y_i|}{\sum_{1=i}^G |y_i|} \cdot B_i \right]
-= \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i \right]
-= J_{GRPO}(θ)
-$$
+变形：
 
-这种相等只是在**期望**意义上相等，在一组具体的采样上，数值**并不相等**.
-
-> 原理：加权平均与简单平均相等的条件
-> 对于n个随机变量 $\{X_i\}_{i=1}^n$ 和相应权重 $w_i$ ，其中 $\sum_{i=1}^n w_i=1$
-> 如果想让简单平均和加权平均的期望相等，即 $\mathbb{E}\left[ \frac{1}{n} \sum_{i=1}^n X_i \right] = \mathbb{E}\left[ \sum_{i=1}^n w_i X_i \right]$ ，则需要满足的条件（二者满足其一即可）：
-> - 平凡情况：所有 $X_i$ 相等
-> - 非平凡情况：$w_i$ 和 $X_i$ 互相独立
-> 如果认为根据token数赋予的权重，与回答的概率、正确性无关，则上述 $J_{DAPO}(θ) = J_{GRPO}(θ)$ 成立。
-
-#### 为什么要按token数加权
-
-对DAPO的目标函数稍加变形：
-
-```math
-\begin{aligned}
-J_{DAPO}(θ) 
-& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{|y_i|}{\sum_{1=i}^G |y_i|} \cdot B_i \right] \\
-& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot \left( \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot B_i \right) \right] \\
-& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i' \right] \qquad 与GRPO形式相同
-\end{aligned}
-```
-
-
-其中 
 ```math
 \begin{aligned}
 B_i' 
-& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
-& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}}' \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
 & = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{1}{ \text{mean} \{|y_i|\} } A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
-& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} A_{y_{i,t}}' \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right)
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot \frac{1}{|y_i|} A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \text{min-clip} \left( \sum_{t=1}^{|y_i|} \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot \text{min-clip} \left( \sum_{t=1}^{|y_i|}  A_{y_{i,t}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \\
+& = \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot B_i
 \end{aligned}
 ```
 
-相当于把GRPO中单个token的优势从 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ 换成 $A_{y_{i,t}}' = \frac{1}{ \text{mean}\{|y_i|\}} A_{y_{i}}$
+带入DAPO的目标函数：
 
-为什么要做这种变换：
-- 原始GRPO中，如果序列 $y_i$ 过长，会稀释单个token的优势 $A_{y_{i,t}} = \frac{1}{|y_i|} A_{y_{i}}$ ，即对长输出不友好（尤其带thinking的情况）
-- 把 $\frac{1}{|y_i|}$ 换成 $\frac{1}{\text{mean}\{|y_i|\}}$ ，单个token的优势就不受序列长度影响了。
-- 这种情况下，每个序列的优势A之和就不是0了。但这并不是错的，GAPO可以认为是用和GRPO不同的启发式方式定义token优势，累加后和GRPO的优势不同，相当于对GRPO优势的“校正”
+```math
+\begin{aligned}
+J_{DAPO}(θ) 
+& = \mathbb{E}_{x \sim D(x)} \left[ \frac{1}{G} \sum_{每个x \atop 生成G个{y_i}} B_i' \right] \qquad 与GRPO形式相同 \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i' \right] \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot \left( \frac{|y_i|}{ \text{mean} \{|y_i|\} } \cdot B_i \right) \right] \\
+& = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{|y_i|}{\sum_{1=i}^G |y_i|} \cdot B_i \right] \qquad 其中 \quad token总数 = G \cdot \text{mean} \{|y_i|\} = \sum_{1=i}^G |y_i|  \\
+\end{aligned}
+```
 
-> 比较：GRPO、GSPO、DAPO
-> - GRPO：蒙特卡洛计算序列级优势 → 启发式token级优势（简单平均）
-> - DAPO（另一种token级）：GRPO的序列级优势 → 另一种启发式的token级优势（排除序列长度影响） → 累加得到校正后的序列级优势
-> - GSPO（序列级）：GRPO的序列级优势（不拆解为token级）
+对比 $J_{GRPO}(θ) = \mathbb{E}_{x \sim D(x)} \left[ \sum_{每个x \atop 生成G个{y_i}} \frac{1}{G} \cdot B_i \right]$ ，可以发现二者形式是相似的：
+- $J_{GRPO}(θ)$ 是对 $B_i$ 的**算数平均**
+- $J_{DAPO}(θ)$ 是对 $B_i$ 的**加权平均**
+
+在**期望**意义上，二者相等（但在一组具体的采样上，**数值**可能不相等）。因为GRPO中优势之和的期望为0，故DAPO中优势之和的期望也为0（期望为0，数值不一定为0）
+
+
+> 原理：算数平均与加权平均，在什么条件下期望相等？
+> 对于n个随机变量 $\{X_i\}_{i=1}^n$ 和相应权重 $w_i$ ，其中 $\sum_{i=1}^n w_i=1$
+> 如果想让算数平均和加权平均的期望相等，即 $\mathbb{E}\left[ \frac{1}{n} \sum_{i=1}^n X_i \right] = \mathbb{E}\left[ \sum_{i=1}^n w_i X_i \right]$ ，则需要满足的条件（二者满足其一即可）：
+> - 平凡情况：所有 $X_i$ 相等（更一般的情况：所有 $X_i$ 的期望相等）
+> - 非平凡情况：$w_i$ 和 $X_i$ 互相独立
 > 
-> 背后隐含的假设：
-> - GRPO：序列中每个token优势相等，token优势受序列长度影响
-> - DAPO：序列中每个token优势相等，但每个token优势不受序列长度影响
-> - GSPO：不要引入启发式计算单个token优势
+> 此处考虑非平凡情况，即**假设：权重 $\frac{|y_i|}{\sum_{1=i}^G |y_i|}$ 和随机变量 $B_i$ 无关，即序列长度和序列的概率、序列的正确性无关**
+
+
+#### DAPO公式的另一种形式
+
+DAPO公式更常见的形式是这样的：
+
+```math
+\begin{aligned}
+J_{DAPO}(θ) 
+&= \mathbb{E}_{x \sim D(x), \{y_i\}_{i=1}^G \sim π_{old}(y_i|x)} \left[ \frac{1}{\sum_{i=1}^G |y_i|} \sum_{i=1}^{G} \sum_{t=1}^{|y_i|} \text{min-clip} \left( A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right]
+\end{aligned}
+```
+其中 $A_{y_{i}} = \frac{r_i - \text{mean}\left(\{r_i\}_{i=i}^G\right)}{\text{std}\left(\{r_i\}_{i=i}^G\right)}$
+
+这种形式和我定义的，修正token优势的形式是等价的：
+
+```math
+\begin{aligned}
+J_{DAPO}(θ) 
+&= \mathbb{E}_{x \sim D(x), \{y_i\}_{i=1}^G \sim π_{old}(y_i|x)} \left[ \frac{1}{G} \sum_{i=1}^{G} \sum_{t=1}^{|y_i|} \text{min-clip} \left( A_{y_{i,t}}' \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right]
+\end{aligned}
+```
+
+其中 $A_{y_{i,t}}' = \frac{1}{ \text{mean}\{|y_i|\}} A_{y_{i}}$
+
+它们都等于
+
+```math
+\begin{aligned}
+J_{DAPO}(θ) 
+&= \mathbb{E}_{x \sim D(x), \{y_i\}_{i=1}^G \sim π_{old}(y_i|x)} \left[  \sum_{i=1}^{G} \frac{|y_i|}{\sum_{i=1}^G |y_i|} \cdot \text{min-clip} \left( A_{y_{i}} \cdot \frac{π_θ(y_{i,t}|x, y_{i,<t})}{π_{old}(y_{i,t}|x, y_{i,<t})} \right) \right]
+\end{aligned}
+```
+
+#### 比较：GRPO、GSPO、DAPO
+
+优势的计算：
+- GRPO：蒙特卡洛计算序列级优势 → 启发式token级优势（算数平均）
+- DAPO（另一种token级）：GRPO的序列级优势 → 另一种启发式的token级优势（排除序列长度影响） →累加得到校正后的序列级优势
+- GSPO（序列级）：GRPO的序列级优势（不拆解为token级）
+
+背后隐含的假设：
+- GRPO：序列中每个token优势相等，token优势受序列长度影响
+- DAPO：序列中每个token优势相等，但每个token优势不受序列长度影响
+- GSPO：不要引入启发式计算单个token优势
 
 
 ### 修改2：clip-higher
