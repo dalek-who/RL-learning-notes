@@ -348,16 +348,26 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
   - $\hat{Q}^π(x, y_i) = \hat{Q}^π(s=x, a=y_i)=\frac{\sum_{包含(x,y_i)的τ_i} G_t (s=x, a=y_i)}{N(s=x,a=y_i)} = \frac{r_i}{1}=r_i$ ，即奖励 $r_i$ 本身
   - $\hat{A}^π(x, y_i) = \hat{Q}^π(x, y_i) - \hat{V}^π(x) = r_i - μ$
 
-观察GRPO公式中的优势： $A(x, y_i) = \frac{ r_i - μ}{σ}$  ，可以发现就是蒙特卡洛的 $\hat{A}^π(x, y_i)= r_i - μ$ 
-  - 唯一的差别是分母 σ，这是为了控制方差范围做的scale（蒙特卡洛本来就有方差大的缺点），属于trick，不影响本质
-  - 这里也能看出为什么计算 $A(x, y_i)$ 必须基于相同的prompt：因为 $V^π(s)$ 必须基于同一个起始状态s才有意义（这里是prompt x）
+观察GRPO公式中的优势： $A(x, y_i) = \frac{ r_i - μ}{σ}$  ，可以发现和蒙特卡洛的 $\hat{A}^π(x, y_i)= r_i - μ$ 只差分母σ
+- 这里也能看出为什么计算 $A(x, y_i)$ 必须基于相同的prompt：因为 $V^π(s)$ 必须基于同一个起始状态s才有意义（这里是prompt x）
+
+## 为什么引入标准差σ
+- 蒙特卡洛法的问题：奖励 $r_i$ 的方差大，导致优势的方差也大
+- 如何控制 $r_i$ 的方差：对所有 $r_i$ 的数值进行统一缩放，将标准差控制在1
+- 具体操作：所有 $r_i$ 除以标准差 σ
+  - 调整后的奖励 $r_i'=\frac{r_i}{σ}$
+  - 调整后 $r_i'$ 的均值 $μ'=\frac{μ}{σ}$
+  - 调整后 $r_i'$ 的标准差 $σ'=1$
+  - 调整后的优势 $\hat{A}^π(x, y_i) = r_i' - μ' = \frac{r_i}{σ} - \frac{μ}{σ} = \frac{ r_i - μ}{σ}$
+  - 可以发现，**调整后的蒙特卡洛的优势 $\hat{A}^π(x, y_i)$ 就是GRPO公式中的优势**
+  
 
 ## token级建模：单个token的优势A
 
 以上介绍的是将完整response视为一个动作，计算出的优势A。但在GRPO中，优势A是针对每个token的，以下将推导单个token的优势。
 
 ### 形式化
-- 问题1：如果将一系列动作合并为一个“大动作”，则大动作的优势是多少？  
+- 问题1：如果将n个动作合并为一个“大动作”，则大动作的优势是多少？  
   - 结论：记单个动作的优势是 $A_i$ , “大动作”的总优势是 $A_{\text{total}}$ , 则 $A_{\text{total}} = A_1 + γ A_2 + γ^2 A_3 + ...$ 即折扣衰减后的优势之和
 
 - 问题2：反过来，已知 “大动作”的总优势是 $A_{\text{total}}$ ，求每个动作的优势 $A_i$
@@ -367,10 +377,21 @@ A^π(s,a) &= Q^π(s,a) - V^π(s)
 ```math
 A_i = 
 \begin{cases}
-\frac{1}{n} A_{\text{total}} & \text{if } γ = 1, \\[1em]
-\frac{(1-γ)}{1-γ^{n}} A_{\text{total}} & \text{if } γ \neq 1.
+\frac{1}{n} A_{\text{total}} & \text{if} γ = 1, \\[1em]
+\frac{(1-γ)}{1-γ^{n}} A_{\text{total}} & \text{if} γ \neq 1.
 \end{cases}
 ```
+
+> 另一种理解：
+> - 假设一个序列上，每个动作的优势 $A_1, ..., A_n$ 是n个随机变量，它们的值可以不同
+> - 单个动作的优势 $A_1, ..., A_n$ 是隐变量，真实值无法观测
+> - 但它们的总和 $A_{\text{total}} = A_1 + A_2 + A_3 + ...$ 可观测（假设折扣因子γ=1）
+> - 代替做法：虽然无法观测真实的 $A_i$ ，但可以用 $A_i$ 的期望 $\mathbb{E}[A_i]$ 代替它。
+>   - 假设：每个动作优势的期望相同： $\mathbb{E}[A_1]=...=\mathbb{E}[A_n]$
+>   - $\mathbb{E}[A_1 + A_2 + A_3 + ...] = n \cdot \mathbb{E}[A_i] = \mathbb{E}[A_{\text{total}}] \Rightarrow \mathbb{E}[A_i]=\frac{1}{n} \mathbb{E}[A_{\text{total}}]$
+>   - 当我们只观测一个序列时，有 $\mathbb{E}[A_{\text{total}}]=A_{\text{total}}$ （把唯一的观测值作为期望）
+>   - 于是 $\mathbb{E}[A_i]=\frac{1}{n} A_{\text{total}}$
+> - 总结：在这种视角下，我们应该把 $\frac{1}{n} A_{\text{total}}$ 当做单个动作的优势期望 $\mathbb{E}[A_i]$ ，我们用期望来代替无法实际观测的隐变量 $A_i$
 
 ### 对应到LLM
 - 把每个token视为一个动作，则整个response就是一个大动作
@@ -388,6 +409,7 @@ A_i =
 - 把prompt当成起始状态s
 - 把整个response当成一个动作a
 - 以同一个prompt的多个rollout作为样本池
+- 通过 $\frac{r}{σ}$ 将所有的奖励的标准差缩放到1 （实际不用手动调整，公式中已经隐含了这个调整）
 - 用蒙特卡洛法估计出的优势A
 - 对应GSPO中整个response的优势A
 
