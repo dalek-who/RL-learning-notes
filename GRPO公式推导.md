@@ -714,25 +714,23 @@ J(θ)
 
 这种情况下的求导：
 
+> 为了防止表达式太复杂，以下用 $p_{θ_1}$ 、 $f_{θ_2}$ 代替 $p_{θ_1}(x)$ 、 $f_{θ_2}(x)$
+> 
 ```math
 \begin{aligned}
 \nabla_{θ_1, θ_2} J_{θ_1, θ_2} 
-& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1}(x)} [f_{θ_2}(x)] \\
-& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[\frac{p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} f_{θ_2}(x) \right] \\
-& = \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) \cdot \nabla_{θ_1} p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} \right] \\
-& = \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) p_{θ_1}(x) \cdot \nabla_{θ_1} \log p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} \right] \\
+& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1}} [f_{θ_2}] \\
+& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1 .detach}} \left[\frac{p_{θ_1}}{p_{θ_1 .detach}} f_{θ_2} \right] \\
+& = \mathbb{E}_{x \sim p_{θ_1 .detach}} \left[ \frac{1}{p_{θ_1 .detach}} \left( p_{θ_1} \cdot \nabla_{θ_2} f_{θ_2} +  f_{θ_2} \cdot \nabla_{θ_1} p_{θ_1} \right) \right] \\
+& = \mathbb{E}_{x \sim p_{θ_1 .detach}} \left[ \frac{1}{p_{θ_1 .detach}} \left( p_{θ_1} \cdot \nabla_{θ_2} f_{θ_2} +  f_{θ_2} p_{θ_1} \cdot \nabla_{θ_1} \log p_{θ_1} \right) \right] \\
+& =  \mathbb{E}_{x \sim p_{θ_1 .detach}} \left[ \frac{p_{θ_1} }{p_{θ_1 .detach}} \left( \nabla_{θ_2} f_{θ_2} +  f_{θ_2} \cdot \nabla_{θ_1} \log p_{θ_1} \right) \right] \\
+& ≈ \frac{1}{N} \sum_{采样N个样本x}  \frac{p_{θ_1} }{p_{θ_1 .detach}} \left( \nabla_{θ_2} f_{θ_2} +  f_{θ_2} \cdot \nabla_{θ_1} \log p_{θ_1} \right)  \qquad 用采样平均来近似期望
 \end{aligned}
 ```
 
-如果是off-policy版本，则要用 $p_{old}采样$：
+> - 如果忽略数值差异，可认为 $\frac{p_{θ_1} }{p_{θ_1 .detach}}≈1$
+> - 如果是off-policy版本，则要用 $p_{old}(x)$ 代替 $p_{θ_1}(x)_{.detach}$ ，此时 $\frac{p_{θ_1} }{p_{old}}$ 通常不能忽略
 
-
-```math
-\begin{aligned}
-\nabla_{θ_1, θ_2} J_{θ_1, θ_2} 
-= \mathbb{E}_{x \sim p_{old}(x)} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) p_{θ_1}(x) \cdot \nabla_{θ_1} \log p_{θ_1}(x)}{p_{old}(x)} \right]
-\end{aligned}
-```
 
 # 实际常用形式
 
