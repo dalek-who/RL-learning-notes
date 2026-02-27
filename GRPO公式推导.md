@@ -531,6 +531,7 @@ J(θ)
 机器学习中有两种目标函数：
 - 参数θ在打分函数上（常见）： $J_θ = \mathbb{E}_{x \sim p(x)} [f_θ(x)]$
 - 参数θ在分布上（罕见）： $\qquad J_θ = \mathbb{E}_{x \sim p_θ(x)} [f(x)]$
+> 极其罕见的场景下，也有分布、打分函数都有参数的情况： $J_{θ_1, θ_2} = \mathbb{E}_{x \sim p_{θ_1}(x)} [f_{θ_2}(x)]$ ，其中 $θ_1, θ_2$ 是两组参数
 
 目标：极大化/极小化采样出的样本的打分期望
 - $x$ ：采样的样本
@@ -700,6 +701,38 @@ J(θ)
 ```
 
 这就是**策略梯度定理**的详细推导版本
+
+## 拓展知识：分布和打分函数都有参数
+
+> GRPO中对KL散度求导需要用到该知识，但最基础的GRPO不涉及。可以选择性阅读该小节
+
+在一些极其罕见的场景下，分布、打分函数可能都有都有参数： $J_{θ_1, θ_2} = \mathbb{E}_{x \sim p_{θ_1}(x)} [f_{θ_2}(x)]$ ，其中 $θ_1, θ_2$ 是两组参数
+
+例：
+- actor-critic或GAN：$p_{θ_1}(x)$ 是actor或generator的生成概率， $f_{θ_2}(x)$ 是critic或discriminator的打分函数
+- GRPO中的KL散度： $\text{KL}(π_θ | π_{ref}) = \mathbb{E}_{x \sim D(x), y \sim π_θ(y|x)} \left[ \log \frac{π_θ(y|x)}{π_{old}(y|x)}\right]$ ，其中 $θ_1=θ_2=θ$ 是同一组参数
+
+这种情况下的求导：
+
+```math
+\begin{aligned}
+\nabla_{θ_1, θ_2} J_{θ_1, θ_2} 
+& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1}(x)} [f_{θ_2}(x)] \\
+& = \nabla_{θ_1, θ_2} \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[\frac{p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} f_{θ_2}(x) \right] \\
+& = \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) \cdot \nabla_{θ_1} p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} \right] \\
+& = \mathbb{E}_{x \sim p_{θ_1}(x)_{.detach}} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) p_{θ_1}(x) \cdot \nabla_{θ_1} \log p_{θ_1}(x)}{p_{θ_1}(x)_{.detach}} \right] \\
+\end{aligned}
+```
+
+如果是off-policy版本，则要用 $p_{old}采样$：
+
+
+```math
+\begin{aligned}
+\nabla_{θ_1, θ_2} J_{θ_1, θ_2} 
+= \mathbb{E}_{x \sim p_{old}(x)} \left[ \frac{p_{θ_1}(x) \cdot \nabla_{θ_2} f_{θ_2}(x) +  f_{θ_2}(x) p_{θ_1}(x) \cdot \nabla_{θ_1} \log p_{θ_1}(x)}{p_{old}(x)} \right]
+\end{aligned}
+```
 
 # 实际常用形式
 
