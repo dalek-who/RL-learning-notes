@@ -174,34 +174,66 @@ $$\text{KL}(P||Q) = \mathbb{E}_{x \sim P(x)} \left[ \log \frac{P(x)}{Q(x)} \righ
 
 # KL散度的估计
 
+监督学习中的正向KL散度不再赘述，只讲GRPO中的逆向KL散度。
+
+## 为什么不直接用上述公式
+
+虽然上面给出了逆向KL散度的公式，但该公式实际中不好用。
+- 原因：高方差
+- 什么是方差：
+  - $\mathbb{E}_{τ \sim P(τ)} [\cdot] = 方差+\frac{1}{N} \sum_{从 P(τ) 采样 \atop N个τ} (\cdot) ≈ \frac{1}{N} \sum_{从 P(τ) 采样 \atop N个τ} (\cdot)$
+  - 方差：“期望”和“采样平均”之间的差值（所以才是约等于）
+  - 高方差：“期望”和“采样平均”之间的差值，随采样波动大
+- 高方差的直观体现：
+  - KL散度根据定义，理论上一定是非负的
+  - 但用采样算出的KL散度，有可能是负的（说明此时方差特别大）
+  - 为什么会采样出负的：
+    - KL散度本质是“用 $π_{ref}$ 编码产生的额外长度”的平均值
+    - 单条数据额外长度可以是负的（此时 $π_{ref} > π_θ$ ）
+    - 如果采样到这样的数据偏多，均值也可能是负的
+    - 本质是采样的数据不够多，但计算资源有限很难大量rollout
+  - 如果KL散度是负的会发生什么：
+    - GRPO的目标：极大化“强化学习优势-KL散度”，但“-KL散度”变成正值了
+    - 不管强化学习的优势，进一步降低 $π_θ$ （KL散度会变得更负，即-KL散度变得更正），就能无脑刷高目标函数了
+    - 结果：灾难性遗忘， $π_θ$ 都变得特别低，甚至生成乱码，连SFT后基本的说话能力都没了 
+
+## KL散度的 $k_1, k_2, k_3$ 估计
+
+因此GRPO公式中，KL散度不是直接用上面的公式算的（方差高），而是用 $k_3$ 估计来计算的。
+
+> 有 $k_3$ 肯定就有 $k_1,k_2$ ，下面一起介绍
+
 我们定义三个量：
 - $k_1 = - \log \frac{π_{ref}}{π_θ}$
 - $k_2 = \frac{1}{2} \left( \log \frac{π_{ref}}{π_θ} \right)^2$
 - $k_3 = \frac{π_{ref}}{π_θ} - 1 - \log \frac{π_{ref}}{π_θ} $
 
-则它们有如下性质（推导略过）
+则它们有如下性质（推导略过）。为了通用性，以下用off-policy的版本来介绍，on-policy把 $π_{old}$ 换成 $π_{θ.detach}$ 即可。
+
 - $k_1$： 
-  - forward： $\mathbb{E}_{π_{θ.detach}}[k_1] = \text{KL}(π_θ | π_{ref})$
-  - backward： $\nabla_θ \mathbb{E}_{π_{θ.detach}}[k_1] = 0$
-  - 性质：方差大，正向无偏，反向没有导数
+  - forward： $\mathbb{E}_{π_{old}}[ \frac{π_{θ}}{π_{old}} k_1] = \text{KL}(π_θ | π_{ref})$
+  - backward： $\nabla_θ \mathbb{E}_{π_{old}}[\frac{π_{θ}}{π_{old}}k_1] = \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - 偏差、方差：方差大，无偏
 - $k_2$：
-  - forward： $\mathbb{E}_{π_{θ.detach}}[k_2] ≈ \text{KL}(π_θ | π_{ref})$ （有偏，但偏差很小）
-  - backward： $\nabla_θ \mathbb{E}_{π_{θ.detach}}[k_2] = \nabla_θ \text{KL}(π_θ | π_{ref})$
-  - 性质：方差小，正向有偏（但偏差很小，近似相等），反向无偏
+  - forward： $\mathbb{E}_{π_{old}}[ \frac{π_{θ.detach}}{π_{old}} k_2] ≈ \text{KL}(π_θ | π_{ref})$
+  - backward： $\nabla_θ \mathbb{E}_{π_{old}}[\frac{π_{θ.detach}}{π_{old}}k_1] = \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - 偏差、方差：方差小，forward有偏（但偏差很小，近似相等），backward无偏
+
 - $k_3$：
-  - forward： $\mathbb{E}_{π_{θ.detach}}[k_3] = \text{KL}(π_θ | π_{ref})$
-  - backward： $\nabla_θ \mathbb{E}_{π_{θ.detach}}[k_3] = \nabla_θ \text{KL}(π_{ref} | π_θ) ≠ \text{KL}(π_θ | π_{ref})$
-  - 性质：方差小，正向无偏，反向有偏（反向的导数不是 $\text{KL}(π_θ | π_{ref})$ ）
-- $\frac{π_{θ}}{π_{θ.detach}}  k_3$：
-  - forward： $\mathbb{E}_{π_{θ.detach}}[\frac{π_{θ}}{π_{θ.detach}}  k_3] = \text{KL}(π_θ | π_{ref})$
-  - backward： $\nabla_θ \mathbb{E}_{π_{θ.detach}}[\frac{π_{θ}}{π_{θ.detach}}  k_3] = \nabla_θ \text{KL}(π_θ | π_{ref})$
-  - 以上 $π_{θ.detach}$ 换成 $π_{old}$ 也都成了
-  - 性质：**方差小，正向无偏，反向也无偏**，但是计算图比较复杂
+  - forward： $\mathbb{E}_{π_{old}}[ \frac{π_{θ}}{π_{old}} k_3] = \text{KL}(π_θ | π_{ref})$
+  - backward： $\nabla_θ \mathbb{E}_{π_{old}}[\frac{π_{θ}}{π_{old}}k_3] = \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - 偏差、方差：方差小，无偏，但计算麻烦一些
 
-> 备注：
-> - 正向无偏：正向= $\text{KL}(π_θ | π_{ref})$
-> - 反向无偏：反向= $\nabla_θ \text{KL}(π_θ | π_{ref})$
+> 注：
+> - $k_2$ 中是 $\frac{π_{θ.detach}}{π_{old}} k_2$ 而不是 $\frac{π_{θ}}{π_{old}} k_2$ ，这一点和 $k_1$ ，$k_3$ 不同。 
+> - 原因：虽然 $\mathbb{E}_{π_{old}}[ \frac{π_{θ}}{π_{old}} k_2] = \text{KL}(π_θ | π_{ref})$ ，但是 $\nabla_θ \mathbb{E}_{π_{old}}[\frac{π_{θ}}{π_{old}}k_2] ≠ \nabla_θ \text{KL}(π_θ | π_{ref})$ ，而且偏差很大不可忽略
 
-因为 $\frac{π_{θ}}{π_{θ.detach}}  k_3$ 良好的性质（正向无偏、反向也无偏，且低方差），因此GRPO中一般使用它来代替KL散度的计算
-> verl中对应 `actor_rollout_ref.actor.kl_loss_type` 选项，GRPO建议使用 `k3`   
-> 此处的`k3`实际指的是 $\frac{π_{θ}}{π_{θ.detach}}  k_3$ 或其离线版本 $\frac{π_{θ}}{π_{old}}  k_3$
+解释：
+- 偏差：$\mathbb{E}_{π_{old}}[...] = 偏差 + \text{KL}(π_θ | π_{ref})$ ，其中 $k1,k3$ 这里是=，因此无偏差；$k_2$是≈，因此有偏差
+  - 但是$k_2$的偏差很小，是 $O(\text{KL})^{1.5}$ 量级，在KL接近于0时，$O(\text{KL})^{1.5}$比KL还小很多，几乎可忽略（但当KL>1时反而会扩大）
+  - k2用几乎能忽略的偏差能换取低方差，在实践中可取
+- 方差：“期望=方差+采样平均”，这里 $k_1$ 方差大，而 $k_2,k_3$ 方差小（至少可以保证非负）
+
+
+因为 $k_3$ 良好的性质（无偏，低方差），因此GRPO中一般使用它来代替KL散度
+> verl中对应 `actor_rollout_ref.actor.kl_loss_type` 选项，GRPO建议使用 `k3` 
