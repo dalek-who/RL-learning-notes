@@ -340,21 +340,21 @@ $$\text{KL}(P||Q) = \mathbb{E}_{x \sim P(x)} \left[ \log \frac{P(x)}{Q(x)} \righ
 - backward： $\mathbb{E}_{π_{θ.detach}}[\nabla_θ \frac{π_{θ}}{π_{θ.detach}} k_1] , \mathbb{E}_{π_{θ.detach}}[\nabla_θ \frac{π_{θ}}{π_{θ.detach}} k_3] , \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2]$
 
 某些代码库可能会提供一种简化的实现（实际有bug，是种错误实现）：
-- forward：$\mathbb{E}_{π_{θ}}[k_1] , \mathbb{E}_{π_{θ}}[k_3] , \mathbb{E}_{π_{θ}}[k_2]$
-- backward：$\mathbb{E}_{π_{θ}}[\nabla_θ k_1] , \mathbb{E}_{π_{θ}}[\nabla_θ k_3] , \mathbb{E}_{π_{θ}}[\nabla_θ k_2]$
+- forward：$\mathbb{E}_{π_{θ.detach}}[k_1] , \mathbb{E}_{π_{θ.detach}}[k_3] , \mathbb{E}_{π_{θ.detach}}[k_2]$
+- backward：$\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_1] , \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_3] , \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2]$
 
 
 bug在哪：
-- forward没问题：$\text{KL}(π_θ | π_{ref}) = \mathbb{E}_{π_{θ}}[\nabla_θ k_1] = \mathbb{E}_{π_{θ}}[\nabla_θ k_3] ≈ \mathbb{E}_{π_{θ}}[\nabla_θ k_2]$
+- forward没问题：$\text{KL}(π_θ | π_{ref}) = \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_1] = \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_3] ≈ \mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2]$
 - backward结果错误（k1,k3是错的，但k2正确）：
-  - k1错误： $\mathbb{E}_{π_{θ}}[\nabla_θ k_1]=0 ≠ \nabla_θ \text{KL}(π_θ | π_{ref})$
-  - k3错误： $\mathbb{E}_{π_{θ}}[\nabla_θ k_3] = \nabla_θ \text{KL}(π_{ref}|π_θ) ≠ \nabla_θ \text{KL}(π_θ | π_{ref})$
-  - 只有k2是正确的： $\mathbb{E}_{π_{θ}}[\nabla_θ k_2] = \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - k1错误： $\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_1]=0 ≠ \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - k3错误： $\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_3] = \nabla_θ \text{KL}(π_{ref}|π_θ) ≠ \nabla_θ \text{KL}(π_θ | π_{ref})$
+  - 只有k2是正确的： $\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2] = \nabla_θ \text{KL}(π_θ | π_{ref})$
 
 修正后的正确实现：
-- forward：仍然是 $\mathbb{E}_{π_{θ}}[k_1] , \mathbb{E}_{π_{θ}}[k_3] , \mathbb{E}_{π_{θ}}[k_2]$
-- backward：无论k1,k2,k3，backward结果统一设置成 $\mathbb{E}_{π_{θ}}[\nabla_θ k_2]$
-  - 因为 $\mathbb{E}_{π_{θ}}[\nabla_θ k_2] = \nabla_θ \text{KL}(π_θ | π_{ref})$ 是一种正确估计
+- forward：仍然是 $\mathbb{E}_{π_{θ.detach}}[k_1] , \mathbb{E}_{π_{θ.detach}}[k_3] , \mathbb{E}_{π_{θ.detach}}[k_2]$
+- backward：无论k1,k2,k3，backward结果统一设置成 $\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2]$
+  - 因为 $\mathbb{E}_{π_{θ.detach}}[\nabla_θ k_2] = \nabla_θ \text{KL}(π_θ | π_{ref})$ 是一种正确估计
 - 这种人工为backward赋值的trick称为“直通估计器”
 > verl的 k1+、k3+选项指的应该就是这回事，其原版实现可能有类似的bug，后来用这种实现打了补丁
 
